@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MML Inventory Control Tower</title>
-<link rel="icon" type="image/png" href="yamaha-logo.png?v=20260723e">
-<link rel="shortcut icon" type="image/png" href="yamaha-logo.png?v=20260723e">
+<link rel="icon" type="image/jpeg" href="yamaha-title-logo.jpg?v=20260723f">
+<link rel="shortcut icon" type="image/jpeg" href="yamaha-title-logo.jpg?v=20260723f">
 <style>
 :root{
   --yamaha-red:#ed1c24;
@@ -145,7 +145,7 @@ nav button:before{content:"";position:absolute;left:0;top:0;height:100%;width:4p
 <body>
 <div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
 <div id="loadingOverlay"><div class="loader-card"><div class="loader-title">Processing Inventory Data</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
-<header><div class="top"><div class="brand-lockup"><img src="yamaha-icon.png" class="brand-logo-icon" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
+<header><div class="top"><div class="brand-lockup"><img src="yamaha-title-logo.jpg" class="brand-logo-img" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
 <div class="layout"><nav id="nav"><button data-v="upload" class="active" onclick="show('upload')">Upload & Generate</button><button data-v="inhouse" onclick="show('inhouse')">In-House Inventory</button><button data-v="external" onclick="show('external')">External Warehouse</button><button data-v="settings" onclick="show('settings')">Export & Settings</button></nav>
 <main class="content"><section id="upload" class="view"></section><section id="inhouse" class="view" hidden></section><section id="external" class="view" hidden></section><section id="settings" class="view" hidden></section><section id="dash" class="view" hidden></section><footer>Local browser application. Uploaded reports are processed in this browser session and can be exported when required.</footer></main></div>
 <script>
