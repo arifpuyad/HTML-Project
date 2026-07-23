@@ -138,7 +138,7 @@ nav button:before{content:"";position:absolute;left:0;top:0;height:100%;width:4p
 <script>
 // ==================== APPLICATION STATE ====================
 const AppState={files:{toll:[],koike:[],line:[],line123:[]},db:null,sort:{},showAll:false,inhousePage:1,inhousePageSize:5000};
-const MAX_FILE_SIZE=50*1024*1024;// 50MB limit
+const MAX_FILE_SIZE=1024*1024*1024;// 1GB limit
 // Pre-compiled regex patterns for better performance
 const REGEX_VENDOR=/YMCN|YIMM|YMVN|TYM|IYM|YMC/i;
 const REGEX_CONTAINER_VENDOR=/-\s*([A-Z0-9]+)\s*-(?:\s*[A-Z]+)?\s*LINE\s*(\d+)/i;
@@ -200,7 +200,7 @@ function setFiles(list,type){
   let oversized=incoming.filter(f=>f.size>MAX_FILE_SIZE).map(f=>f.name);
   if(oversized.length>0){
     var log=document.getElementById('log');
-    if(log)log.innerHTML='<div class="notice bad"><b>File size error:</b> '+oversized.join(', ')+' exceed 50MB limit. Please use smaller files.</div>';
+    if(log)log.innerHTML='<div class="notice bad"><b>File size error:</b> '+oversized.join(', ')+' exceed 1GB limit. Please use smaller files.</div>';
     return;
   }
   if(type==='line'||type==='line123'){
