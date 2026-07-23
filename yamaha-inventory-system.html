@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MML Inventory Control Tower v26</title>
+<style>
+:root{
+  --yamaha-red:#ed1c24;
+  --yamaha-red-dark:#b91018;
+  --yamaha-navy:#0b1118;
+  --yamaha-mirage:#1b242c;
+  --yamaha-blue:#004b93;
+  --yamaha-blue2:#0978c9;
+  --yamaha-silver:#b5b7b6;
+  --yamaha-ice:#f5f7fa;
+  --yamaha-white:#ffffff;
+  --ink:#08192b;
+  --muted:#607086;
+  --line:#d8e0ea;
+  --panel:#ffffff;
+  --shadow:0 18px 45px rgba(11,17,24,.12);
+  --radius:18px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:"Segoe UI",Arial,sans-serif;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 10% 0%,rgba(237,28,36,.10),transparent 30%),
+    linear-gradient(135deg,#eef3f8 0%,#f7f9fc 45%,#ffffff 100%);
+}
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  opacity:.07;
+  background:
+    repeating-linear-gradient(135deg,transparent 0 18px,var(--yamaha-mirage) 18px 19px,transparent 19px 36px),
+    linear-gradient(90deg,transparent 0 70%,var(--yamaha-red) 70% 70.35%,transparent 70.35% 100%);
+  z-index:-1;
+}
+header{
+  position:relative;
+  overflow:hidden;
+  background:
+    linear-gradient(105deg,var(--yamaha-navy) 0%,var(--yamaha-mirage) 48%,#101923 100%);
+  color:var(--yamaha-white);
+  padding:22px 28px 24px;
+  box-shadow:0 10px 30px rgba(0,0,0,.28);
+  border-bottom:4px solid var(--yamaha-red);
+}
+header:before{
+  content:"";
+  position:absolute;
+  top:-80px;
+  right:-90px;
+  width:360px;
+  height:260px;
+  transform:rotate(-18deg);
+  background:linear-gradient(90deg,transparent 0 30%,rgba(237,28,36,.90) 30% 42%,transparent 42% 100%);
+  opacity:.85;
+}
+header:after{
+  content:"";
+  position:absolute;
+  left:0;
+  bottom:0;
+  height:1px;
+  width:100%;
+  background:linear-gradient(90deg,var(--yamaha-red),var(--yamaha-silver),transparent);
+}
+.top{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:18px}
+.brand-lockup{display:flex;align-items:center;gap:16px}
+.brand-logo-img{
+  width:210px;
+  max-width:26vw;
+  height:auto;
+  display:block;
+  object-fit:contain;
+  filter:drop-shadow(0 8px 18px rgba(0,0,0,.32));
+  background:#fff;
+  border-radius:12px;
+  padding:8px 10px;
+  border:1px solid rgba(255,255,255,.55);
+}
+@media(max-width:700px){.brand-logo-img{width:170px;max-width:60vw}}
+
+.brand-emblem{
+  width:54px;height:54px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.76);
+  background:radial-gradient(circle at 50% 50%,#ffffff 0 7%,transparent 8% 100%),linear-gradient(145deg,var(--yamaha-red),#7c0710);
+  box-shadow:0 0 0 7px rgba(237,28,36,.18), inset 0 0 18px rgba(255,255,255,.20);
+  position:relative;flex:0 0 auto;
+}
+.brand-emblem:before,.brand-emblem:after{content:"";position:absolute;left:50%;top:50%;width:34px;height:3px;background:#fff;border-radius:999px;transform-origin:left center;box-shadow:0 0 5px rgba(255,255,255,.8)}
+.brand-emblem:before{transform:rotate(30deg) translate(-8px,-1px)}
+.brand-emblem:after{transform:rotate(150deg) translate(-8px,-1px)}
+.brand-spoke{position:absolute;left:50%;top:50%;width:34px;height:3px;background:#fff;border-radius:999px;transform-origin:left center;transform:rotate(270deg) translate(-8px,-1px);box-shadow:0 0 5px rgba(255,255,255,.8)}
+h1{margin:0;font-size:28px;letter-spacing:.3px;text-transform:uppercase;font-weight:900;line-height:1.05}.brand-word{color:#fff}.brand-word span{color:var(--yamaha-red)}
+.small{opacity:.86;margin-top:6px;letter-spacing:.08em;text-transform:uppercase;font-size:12px;font-weight:700;color:#d7dee8}.badge{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);border-left:5px solid var(--yamaha-red);border-radius:16px;padding:10px 14px;font-size:13px;box-shadow:inset 0 0 20px rgba(255,255,255,.04);backdrop-filter:blur(8px)}
+.layout{display:grid;grid-template-columns:255px 1fr;min-height:calc(100vh - 104px)}
+nav{background:linear-gradient(180deg,#0a0f15,var(--yamaha-mirage));padding:18px 12px;border-right:1px solid rgba(255,255,255,.07);box-shadow:10px 0 30px rgba(12,21,35,.12)}
+nav button{display:block;width:100%;margin:0 0 12px;padding:13px 14px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.05);color:#e9eef5;text-align:left;font-weight:800;letter-spacing:.02em;cursor:pointer;position:relative;overflow:hidden;transition:.18s ease}
+nav button:before{content:"";position:absolute;left:0;top:0;height:100%;width:4px;background:transparent;transition:.18s ease}nav button.active,nav button:hover{background:linear-gradient(90deg,rgba(237,28,36,.95),rgba(237,28,36,.25));color:#fff;transform:translateX(2px);box-shadow:0 9px 20px rgba(237,28,36,.18)}nav button.active:before,nav button:hover:before{background:#fff}
+.content{padding:24px;overflow:auto}.panel{background:rgba(255,255,255,.94);border:1px solid rgba(181,183,182,.55);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:20px;backdrop-filter:blur(8px)}.panel h2{margin-top:0;color:#071526;font-size:22px}.notice{border-left:5px solid var(--yamaha-red);background:linear-gradient(90deg,#fff6f6,#f1f7ff);padding:13px 15px;border-radius:14px;margin:12px 0;color:#19314f}.notice.ok{border-left-color:#0baa66;background:linear-gradient(90deg,#eefcf5,#f6fbff)}.notice.bad{border-left-color:var(--yamaha-red);background:#fff1f1}.grid3{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:16px}.drop{border:2px dashed rgba(27,36,44,.25);border-radius:18px;background:linear-gradient(180deg,#fff,#f7f9fc);padding:18px;min-height:176px;position:relative;overflow:hidden}.drop:before{content:"";position:absolute;left:0;top:0;width:100%;height:4px;background:linear-gradient(90deg,var(--yamaha-red),var(--yamaha-blue2))}.drop b{font-size:15px}.hint{color:var(--muted);font-size:13px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:13px 0}.btn,button{border:0;border-radius:13px;background:linear-gradient(180deg,#334155,#1f2937);color:white;padding:10px 15px;font-weight:800;cursor:pointer;box-shadow:0 7px 14px rgba(15,23,42,.14);transition:.16s ease}.btn:hover,button:hover{transform:translateY(-1px);filter:brightness(1.04)}.btn.green{background:linear-gradient(180deg,#16a86d,#08784d)}.btn.danger{background:linear-gradient(180deg,#ef4444,#b91c1c)}.btn.secondary{background:linear-gradient(180deg,#3b485a,#1f2937)}.btn.mini{padding:4px 8px;font-size:11px}input,select{border:1px solid #c5d1df;border-radius:13px;padding:10px 12px;background:#fff;min-width:180px;box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}input:focus,select:focus{outline:3px solid rgba(237,28,36,.18);border-color:var(--yamaha-red)}.inv-scroll{overflow:auto;border:1px solid var(--line);border-radius:16px;background:white;max-height:65vh;box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}.inv-grid{display:block}.inv-head,.inv-row{display:grid;border-bottom:1px solid var(--line)}.inv-th{position:sticky;top:0;background:linear-gradient(180deg,#101923,#1b242c);color:#fff;font-weight:900;text-transform:uppercase;font-size:12px;padding:11px 10px;border-bottom:3px solid var(--yamaha-red);cursor:pointer;letter-spacing:.03em}.inv-td{padding:9px 10px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.inv-row:nth-child(odd){background:#fbfcfe}.inv-row:hover{background:#fff5f5}.pill{border-radius:999px;padding:4px 9px;font-weight:900;font-size:11px}.pill.used{background:#fee2e2;color:#991b1b}.pill.stock{background:#dcfce7;color:#166534}.pill.new{background:#e0f2fe;color:#075985}.empty{border:1px dashed #b7c5d6;border-radius:18px;padding:30px;text-align:center;background:#fbfdff}.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.kpi{background:linear-gradient(180deg,#fff,#f6f8fb);border:1px solid var(--line);border-radius:16px;padding:15px;box-shadow:0 8px 18px rgba(15,23,42,.06)}.kpi .label{color:var(--muted);font-size:12px;text-transform:uppercase;font-weight:800;letter-spacing:.05em}.kpi .value{font-size:26px;font-weight:900;margin-top:6px;color:#0a1726}footer{color:var(--muted);font-size:12px;padding:14px}.successModal,#loadingOverlay{position:fixed;inset:0;background:rgba(3,7,18,.72);display:none;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(5px)}.successCard,.loader-card{background:white;padding:30px;border-radius:22px;text-align:center;box-shadow:0 20px 70px rgba(0,0,0,.42);min-width:350px;border-top:5px solid var(--yamaha-red)}.successIcon{font-size:44px;color:#0baa66}.successBtn{background:linear-gradient(180deg,#16a86d,#08784d)}.loader-title{font-weight:900;text-transform:uppercase;letter-spacing:.06em}.loader-bar,.parser-bar{height:13px;background:#dbe2ec;border-radius:999px;overflow:hidden;margin:16px 0;position:relative}.loader-fill,.parser-fill{height:100%;width:55%;background:linear-gradient(90deg,var(--yamaha-red),#fff,var(--yamaha-blue2));animation:yLead 1.15s infinite ease-in-out;border-radius:999px}@keyframes yLead{0%{transform:translateX(-110%)}100%{transform:translateX(210%)}}.parser-loader{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px}.parser-pulse{font-weight:900;color:var(--yamaha-red);text-transform:uppercase;letter-spacing:.06em}@media(max-width:1100px){.layout{grid-template-columns:1fr}nav{display:flex;gap:8px;overflow:auto}nav button{min-width:175px}.grid3{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.top{align-items:flex-start;flex-direction:column}}
+
+.logo-fallback{
+  width:210px;
+  max-width:26vw;
+  min-height:40px;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:#fff;
+  color:#ed1c24;
+  border-radius:12px;
+  padding:8px 14px;
+  font-weight:1000;
+  letter-spacing:.08em;
+  font-size:27px;
+  line-height:1;
+  border:1px solid rgba(255,255,255,.55);
+  box-shadow:0 8px 18px rgba(0,0,0,.32);
+}
+@media(max-width:700px){.logo-fallback{width:170px;max-width:60vw;font-size:22px}}
+</style>
+</head>
+<body>
+<div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
+<div id="loadingOverlay"><div class="loader-card"><div class="loader-title">Processing Inventory Data</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
+<header><div class="top"><div class="brand-lockup"><div class="logo-fallback" style="display:flex" aria-label="Yamaha text placeholder">YAMAHA</div><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
+<div class="layout"><nav id="nav"><button data-v="upload" class="active" onclick="show('upload')">Upload & Generate</button><button data-v="inhouse" onclick="show('inhouse')">In-House Inventory</button><button data-v="external" onclick="show('external')">External Warehouse</button><button data-v="settings" onclick="show('settings')">Export & Settings</button></nav>
+<main class="content"><section id="upload" class="view"></section><section id="inhouse" class="view" hidden></section><section id="external" class="view" hidden></section><section id="settings" class="view" hidden></section><section id="dash" class="view" hidden></section><footer>Local browser application. Uploaded reports are processed in this browser session and can be exported when required.</footer></main></div>
+<script>
+// ==================== APPLICATION STATE ====================
+const AppState={files:{toll:[],koike:[],line:[],line123:[]},db:null,sort:{},showAll:false,inhousePage:1,inhousePageSize:5000};
+const MAX_FILE_SIZE=50*1024*1024;// 50MB limit
+// Pre-compiled regex patterns for better performance
+const REGEX_VENDOR=/YMCN|YIMM|YMVN|TYM|IYM|YMC/i;
+const REGEX_CONTAINER_VENDOR=/-\s*([A-Z0-9]+)\s*-(?:\s*[A-Z]+)?\s*LINE\s*(\d+)/i;
+// ==================== UTILITY FUNCTIONS ====================
+/**
+ * Creates an empty database structure
+ * @returns {Object} Empty database with containers, movements, lineCases arrays
+ */
+function emptyDB(){return{containers:[],movements:[],lineCases:[],sources:[],generatedAt:null}}
+AppState.db=emptyDB();
+/**
+ * Shows the success modal with generation summary
+ */
+function showSuccessPrompt(){var s=summary();document.getElementById('successInfo').innerHTML='Records Loaded: '+fmt(s.lineCases)+'<br>Containers: '+fmt(s.containers)+'<br>Generated: '+AppState.db.generatedAt;document.getElementById('successModal').style.display='flex';}
+/**
+ * Closes success modal and navigates to inhouse view
+ */
+function closeSuccessAndView(){document.getElementById('successModal').style.display='none';show('inhouse');}
+/**
+ * Updates generation progress bar (used during file processing)
+ * @param {number} p - Progress percentage (0-100)
+ * @param {string} msg - Status message to display
+ */
+function updateGenProgress(p,msg){var b=document.getElementById('gpBar');var s=document.getElementById('gpStatus');var pct=document.getElementById('gpPct');if(b)b.style.width=p+'%';if(s)s.textContent=msg||'Processing';if(pct)pct.textContent=Math.round(p)+'%';}
+/**
+ * Shows the loading overlay with an optional message
+ * @param {string} msg - Optional message to display
+ */
+function showLoader(msg){var o=document.getElementById("loadingOverlay");if(o){o.style.display="flex";if(msg){var t=o.querySelector(".loader-text");if(t)t.textContent=msg;}}}
+/**
+ * Hides the loading overlay
+ */
+function hideLoader(){var o=document.getElementById("loadingOverlay");if(o)o.style.display="none";}
+// Global error handler
+window.addEventListener('error',function(e){var log=document.getElementById('log');if(log){log.innerHTML='<div class="notice bad"><b>Script error:</b> '+(e.message||'Unknown error')+'</div>';}});
+// Single event listener for all button clicks to show loader (consolidated from 4 duplicate listeners)
+document.addEventListener("click",function(e){if(e.target.closest("button")){showLoader("Updating inventory view...");setTimeout(hideLoader,300);}});
+/**
+ * Checks if there is any loaded data
+ * @returns {boolean} True if database contains data
+ */
+function hasData(){return AppState.db.containers.length+AppState.db.movements.length+AppState.db.lineCases.length>0}
+function fmt(n){return Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2})}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function clean(x){return String(x??'').trim()}
+function num(x){return Number(String(x??'0').replace(/,/g,''))||0}
+function norm(x){return clean(x).toLowerCase().replace(/\s+/g,' ')}
+function dval(x){return clean(x)}
+function fileKey(f){return [f.name,f.size,f.lastModified].join('|')}
+function ensureXLSX(){return new Promise(function(resolve,reject){if(window.XLSX){resolve();return}var log=document.getElementById('log');if(log){log.innerHTML='<div class="parser-loader"><div class="parser-pulse">Preparing Inventory Engine</div><div style="font-size:13px;color:#64748b">Loading Excel Processing Library (XLSX Parser)</div><div class="parser-bar"><div class="parser-fill"></div></div><div style="font-size:12px;color:#64748b;margin-top:8px">Please wait while the inventory engine initializes...</div></div>'}var sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';sc.onload=function(){resolve()};sc.onerror=function(){reject(new Error('Excel parser could not load. Download this HTML and open it locally in Edge/Chrome, then allow internet access for the parser.'))};document.head.appendChild(sc);});}
+/**
+ * Sets files for a given type with validation
+ * @param {FileList} list - Files to upload
+ * @param {string} type - File type category (toll, koike, line, line123)
+ */
+function setFiles(list,type){
+  let incoming=Array.from(list||[]);
+  // Validate file sizes (max 50MB per file)
+  let oversized=incoming.filter(f=>f.size>MAX_FILE_SIZE).map(f=>f.name);
+  if(oversized.length>0){
+    var log=document.getElementById('log');
+    if(log)log.innerHTML='<div class="notice bad"><b>File size error:</b> '+oversized.join(', ')+' exceed 50MB limit. Please use smaller files.</div>';
+    return;
+  }
+  if(type==='line'||type==='line123'){
+    let seen=new Set(AppState.files[type].map(fileKey));
+    incoming.forEach(f=>{if(!seen.has(fileKey(f))){AppState.files[type].push(f);seen.add(fileKey(f))}})}
+  else{AppState.files[type]=incoming}
+  renderUpload()
+}
+function removeLineFile(type,i){AppState.files[type].splice(i,1);renderUpload()}
+function clearType(type){AppState.files[type]=[];renderUpload()}
+function noData(t){return`<div class="empty"><div><h2>${t}</h2><p class="hint">Upload the reports and click <b>Generate Inventory</b>. No uploaded data is displayed before generation.</p><button class="btn" onclick="show('upload')">Go to Upload</button></div></div>`}
+function show(v){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));document.querySelectorAll('.view').forEach(x=>x.hidden=true);document.getElementById(v).hidden=false}
+document.getElementById('nav').onclick=e=>{if(e.target.tagName==='BUTTON')show(e.target.dataset.v)};
+function renderUpload(){let f=t=>AppState.files[t].map((x,i)=>(t==='line'||t==='line123')?`${esc(x.name)} <button class="btn secondary mini" onclick="removeLineFile('${t}',${i})">Remove</button>`:esc(x.name)).join('<br>')||'No file selected';document.getElementById('upload').innerHTML=`<div class="panel"><h2>Upload & Generate Inventory</h2><div class="notice ok"><b>Professional view:</b> Upload your reports, then use Model, Order No and Case No filters. Click any table header to sort A-Z or Z-A.</div><div class="grid3"><div class="drop"><b>Toll Global IN/OUT</b><p class="hint">Sheets: INBOUND and OUTBOUND.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'toll')"><p class="hint">${f('toll')}</p></div><div class="drop"><b>Koike Incoming</b><p class="hint">Visible monthly sheets only. Hidden sheets are skipped.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'koike')"><p class="hint">${f('koike')}</p></div><div class="drop"><b>In-House Line 4</b><p class="hint">Multiple upload is enabled. Add Line 4 files such as YIMM, YMVN, TYM together or one by one.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'line');this.value=''"><div class="toolbar" style="margin:8px 0"><button class="btn secondary" onclick="clearType('line')">Clear Line 4 files</button></div><p class="hint"><b>Selected Line 4 files:</b><br>${f('line')}</p></div><div class="drop"><b>In-House Line 1,2,3</b><p class="hint">Upload Instant Warehouse Record files. Vendor is detected from filename: YIMM, VIETNAM/YMVN, TYM, or CKD/YMC. These records appear as Line 1,2,3.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'line123');this.value=''"><div class="toolbar" style="margin:8px 0"><button class="btn secondary" onclick="clearType('line123')">Clear Line 1,2,3 files</button></div><p class="hint"><b>Selected Line 1,2,3 files:</b><br>${f('line123')}</p></div></div><div class="toolbar"><button class="btn green" onclick="generate()">Generate Inventory</button><button class="btn danger" onclick="clearAll()">Clear</button><button class="btn secondary" onclick="exportJSON()">Export JSON</button></div><div id="log" class="hint"></div><noscript><div class="notice bad">JavaScript is blocked. Download the HTML and open locally in Microsoft Edge or Chrome.</div></noscript></div>`}
+async function generate(){showLoader("Generating inventory from uploaded files...");try{await ensureXLSX()}catch(e){document.getElementById('log').innerHTML='<div class="notice bad"><b>Excel parser not loaded:</b> '+e.message+'</div>';return}if(!AppState.files.toll.length&&!AppState.files.koike.length&&!AppState.files.line.length){document.getElementById('log').innerHTML='<div class="notice bad">Select at least one report file.</div>';return}AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;let msgs=[];let total=['toll','koike','line','line123'].reduce((a,t)=>a+AppState.files[t].length,0);let done=0;for(let type of ['toll','koike','line','line123'])for(let file of AppState.files[type]){updateGenProgress((done/Math.max(total,1))*100,'Reading '+file.name);try{let r=await readWorkbook(file,type);msgs.push(`${file.name}: ${r.containers} containers, ${r.movements} movements, ${r.lineCases} in-house cases${r.hidden?`, ${r.hidden} hidden sheet(s) skipped`:''}`);AppState.db.sources.push(file.name);done++;updateGenProgress((done/Math.max(total,1))*100,'Processed '+file.name)}catch(e){msgs.push(`${file.name}: ERROR ${e.message}`)}}AppState.db.generatedAt=new Date().toLocaleString();renderAll();hideLoader();show('inhouse');let log=document.getElementById('log');if(log)log.innerHTML='<div class="notice ok"><b>Generated.</b><br>'+msgs.map(esc).join('<br>')+'</div>'}
+function readWorkbook(file,type){return new Promise((res,rej)=>{let fr=new FileReader();fr.onerror=()=>rej(new Error('cannot read file'));fr.onload=e=>{try{let wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});let out={containers:0,movements:0,lineCases:0,hidden:0};wb.SheetNames.forEach((name,i)=>{let meta=wb.Workbook&&wb.Workbook.Sheets?wb.Workbook.Sheets[i]:null;if(meta&&meta.Hidden){out.hidden++;return}let rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:'',raw:false});let x=transform(rows,type,name,file.name);AppState.db.containers.push(...x.containers);AppState.db.movements.push(...x.movements);AppState.db.lineCases.push(...x.lineCases);out.containers+=x.containers.length;out.movements+=x.movements.length;out.lineCases+=x.lineCases.length});res(out)}catch(err){rej(err)}};fr.readAsArrayBuffer(file)})}
+function findHeader(rows,words){for(let i=0;i<Math.min(rows.length,30);i++){let j=rows[i].join('|').toLowerCase();if(words.every(w=>j.includes(w.toLowerCase())))return i}return 0}
+function idx(h,names){for(let nm of names){let j=h.findIndex(x=>x.includes(norm(nm)));if(j>=0)return j}return -1}
+/**
+ * Checks if a date value is in the future (with error handling)
+ * @param {*} v - Value to check
+ * @returns {boolean} True if date is in the future
+ */
+function isFutureDate(v){
+  if(!v)return false;
+  try{
+    let d=new Date(v);
+    return !isNaN(d) && d>new Date();
+  }catch(e){
+    return false;
+  }
+}
+
+/**
+ * Parses inventory date from multiple formats with error handling
+ * @param {string} v - Date string to parse
+ * @returns {Date|null} Parsed date or null if invalid
+ */
+function parseInventoryDate(v){
+  v=clean(v);
+  if(!v)return null;
+  try{
+    let m=v.match(/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})$/);
+    if(m){
+      let d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+      return isNaN(d)?null:d;
+    }
+    m=v.match(/^(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})$/);
+    if(m){
+      let d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
+      return isNaN(d)?null:d;
+    }
+    let d=new Date(v);
+    return isNaN(d)?null:d;
+  }catch(e){
+    return null;
+  }
+}
+function isPastInventoryDate(v){
+  let d=parseInventoryDate(v);
+  if(!d)return false;
+  let today=new Date();
+  today.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  return d<today;
+}
+/**
+ * Extracts vendor information from container filename
+ * @param {string} name - Filename to parse
+ * @returns {Object} Object with vendor and line properties
+ */
+function vendorFrom(name){
+  let m=name.match(REGEX_CONTAINER_VENDOR);
+  let found=(name.match(REGEX_VENDOR)||['UNKNOWN'])[0].toUpperCase();
+  return{vendor:m?m[1].toUpperCase():found,line:m?`Line ${m[2]}`:'Line 4'}
+}
+/**
+ * Extracts vendor information from Instant Warehouse Record filename
+ * @param {string} name - Filename to parse
+ * @returns {Object} Object with vendor and line properties
+ */
+function vendorFromInstant(name){
+  let n=String(name||'').toUpperCase();
+  let vendor=n.includes('YIMM')?'YIMM':(n.includes('VIETNAM')||n.includes('YMVN'))?'YMVN':n.includes('TYM')?'TYM':(n.includes('CKD')||n.includes('YMC'))?'YMC':'UNKNOWN';
+  return{vendor,line:'Line 1,2,3'}
+}
+function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[],lineCases:[]};if(type==='toll'){let h=findHeader(rows,['Container']);let head=rows[h].map(norm);let c=idx(head,['container']);if(c<0)c=2;let inbound=sheet.toLowerCase().includes('inbound')||idx(head,['no. of box'])>=0;if(inbound){for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;o.containers.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,containerNo:clean(r[c]).toUpperCase(),dateArrive:dval(r[idx(head,['date arrive'])]),dateReceive:dval(r[idx(head,['date receive'])]),origin:clean(r[idx(head,['origin'])]),m3:num(r[idx(head,['m3'])]),boxQty:num(r[idx(head,['no. of box'])]),palletQty:0})}}else{for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;let b=num(r[idx(head,['balance'])]);o.movements.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,date:dval(r[idx(head,['date offloading'])])||dval(r[idx(head,['date arrive'])]),containerNo:clean(r[c]).toUpperCase(),invoiceNo:clean(r[idx(head,['invoice no'])]),caseMarkOrderNo:clean(r[idx(head,['case mark order no'])]),model:clean(r[idx(head,['modal'])]),caseIn:clean(r[idx(head,['case in'])]),caseOut:clean(r[idx(head,['case out'])]),balance:b,location:clean(r[idx(head,['location'])]),status:b>0?'Open':'Closed'})}}}
+if(type==='koike'){let h=findHeader(rows,['Container Number']);let head=rows[h].map(norm);let col=idx(head,['container number']);if(col<0)col=2;for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[col])continue;o.containers.push({warehouse:'Koike',sourceFile,sourceSheet:sheet,cdaNo:clean(r[idx(head,['cda no'])]),containerNo:clean(r[col]).toUpperCase(),pullInTime:clean(r[idx(head,['pull in time'])]),dateArrive:dval(r[idx(head,['pull in date'])]),dateReceive:dval(r[idx(head,['koike unstuffing'])]),pullOutDate:dval(r[idx(head,['pull out date'])]),sizeType:clean(r[idx(head,['cont size'])]),model:clean(r[idx(head,['part (model)','part model','model'])]),palletQty:num(r[idx(head,['qty plt','pallet'])]),m3:num(r[idx(head,['m3'])]),caseMark:clean(r[idx(head,['case mark'])]),country:clean(r[idx(head,['country'])]),origin:'YMVN/Koike'})}}
+if(type==='line'){let meta=vendorFrom(sourceFile), sheetModel=clean(rows[1]?.[1])||sheet, setQty=clean(rows[1]?.[3]);function rowBlank(r){r=r||[];for(let i=0;i<7;i++){if(clean(r[i]))return false}return true}function caseNorm(x){let s=clean(x).replace(/^'/,'');if(/^\d+$/.test(s))s=s.padStart(6,'0');return s}function isCaseNo(x){return /^\d{6}$/.test(caseNorm(x))}function isRemark(x){x=norm(x);return !x||x.includes('receive from')||x.includes('hlym receive')||x.includes('koike')||x.includes('pull')||x.includes('receive')}let blocks=[],current=[];for(let ri=3;ri<rows.length;ri++){let r=rows[ri]||[];if(rowBlank(r)){if(current.length){blocks.push(current);current=[]}continue}if(isCaseNo(r[2])||clean(r[1]))current.push({rowNumber:ri+1,row:r})}if(current.length)blocks.push(current);blocks.forEach((block,bi)=>{let bTexts=block.map(x=>clean(x.row[1])).filter(Boolean);let remarks=bTexts.filter(isRemark).join(' | ');let candidates=bTexts.filter(x=>!isRemark(x));let orderNo=candidates[0]||'';let blockModelName=candidates[1]||'';let blockColourCode=candidates[2]||'';let caseItems=block.map(x=>({x,caseNo:caseNorm(x.row[2])})).filter(y=>isCaseNo(y.caseNo));if(!caseItems.length)return;let firstCase=caseItems[0].caseNo,lastCase=caseItems[caseItems.length-1].caseNo;let lotNo=firstCase.slice(0,3),caseFrom=firstCase.slice(3),caseTo=lastCase.slice(3);let pullInDate=dval(caseItems[0].x.row[3]);caseItems.forEach(y=>{let r=y.x.row,caseNo=y.caseNo;let dr=dval(r[3]),du=dval(r[5]);let st=du?'Used':(dr?'In Stock':'Not Received');let actualReceive=dr;let expectedReceive='';if(st==='Not Received'){if(isPastInventoryDate(pullInDate)){st='Used';actualReceive=pullInDate;}else if(pullInDate){expectedReceive=pullInDate;}} o.lineCases.push({vendor:meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:sheet,modelFull:sheetModel,modelName:blockModelName,colourCode:blockColourCode,orderNo,setQty,blockNo:bi+1,blockStartRow:block[0].rowNumber,sourceRow:y.x.rowNumber,blockLotNo:lotNo,blockCaseFrom:caseFrom,blockCaseTo:caseTo,blockCaseCount:caseItems.length,blockPullInDate:pullInDate,remarks,markingNo:clean(r[1]),caseNo,lotNo:caseNo.slice(0,3),caseSeq:caseNo.slice(3),dateReceive:actualReceive,expectedReceive:expectedReceive,robFull:clean(r[4]),dateUse:du,seq:clean(r[6]),status:st})})})}
+if(type==='line123'){
+  let meta=vendorFromInstant(sourceFile);
+  let h=findHeader(rows,['case no']);
+  let head=(rows[h]||[]).map(norm);
+  let cCase=idx(head,['case no']); if(cCase<0)cCase=2;
+  let cMark=idx(head,['marking no']); if(cMark<0)cMark=1;
+  let cRec=idx(head,['rec date','date receive']); if(cRec<0)cRec=3;
+  let cRob=idx(head,['rob','full']); if(cRob<0)cRob=4;
+  let cUse=idx(head,['to f3','date back to f3']); if(cUse<0)cUse=5;
+  let cSeq=idx(head,['seq','remarks']); if(cSeq<0)cSeq=6;
+  let sheetModel='';
+  for(let mi=0;mi<Math.min(rows.length,8);mi++){
+    let r=rows[mi]||[];
+    for(let mj=0;mj<Math.min(r.length,4);mj++){
+      if(norm(r[mj]).includes('model')){sheetModel=clean(r[mj+1]||r[mj]).replace(/^model\s*:?\s*/i,'');break}
+    }
+    if(sheetModel)break;
+  }
+  sheetModel=sheetModel||sheet;
+  function caseNorm123(x){let s=clean(x).replace(/^'/,''); if(/^\d+$/.test(s))s=s.padStart(6,'0'); return s}
+  function isCaseNo123(x){return /^\d{6}$/.test(caseNorm123(x))}
+  function inferOrderFromModelLine123(x){
+    let s=clean(x).split('@')[0].split('/')[0].trim();
+    if(!s)return '';
+    // BTL1AA becomes BTL1 AA so the fallback looks like the order style in the source workbook.
+    s=s.replace(/([A-Z]+\d+)([A-Z]{2,})$/i,'$1 $2');
+    return s;
+  }
+  function isDateLikeLine123(x){
+    let s=clean(x);
+    if(!s)return false;
+    if(/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{2,4})$/.test(s))return true;
+    if(/^(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})$/.test(s))return true;
+    return false;
+  }
+  function isDetailOrSubPartLine123(x){
+    let s=clean(x); if(!s)return true;
+    let n=norm(s);
+    if(isDateLikeLine123(s))return true;
+    // Common non-order details found in Instant Warehouse Record: quantity, engine, colour code, source note. NCxxxxx is treated as Order No; MDBxxxxx is treated as Colour Code.
+    if(/^\d+(?:\.\d+)?\s*(unit|units|pcs|pc|set|sets|case|cases|box|boxes)\b/i.test(s))return true;
+    if(/^(unit|units|pcs|pc|set|sets|case|cases|box|boxes)\b/i.test(s))return true;
+    if(/^[a-z0-9]{1,8}\s*=\s*\d+/i.test(s))return true;
+    if(n==='engine'||n.includes('engine '))return true;
+    if(n.includes('receive')||n.includes('from koike')||n==='koike'||n.includes('hlym')||n.includes('pull'))return true;
+    if(n.includes('full case')||n.includes('use for prod')||n.includes('rob sub')||n.includes('lot mati'))return true;
+    // User-confirmed non-order notes. Keep the previous valid Order No for the same data block.
+    if(/^\(.+\)$/i.test(s))return true;
+    // Parentheses part notes can be followed by quantity or colour balance text, e.g. "( Fuel Tank ) P2 MDNM6 = 0".
+    if(/\(\s*(fuel\s*tank|f\.?fender|f\.?tank)\s*\)/i.test(s))return true;
+    if(/^\([^)]*\)\s*P\d+\s+[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
+    if(/^P\d+\s+[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
+    if(/^\*+\s*for\s+pdrm$/i.test(s))return true;
+    if(/^\d+\s*:\s*[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
+    if(/^[A-Z]\d\s+\d{3}[A-Z]?$/i.test(s))return true;
+    if(/^[A-Z]\d\s*\([^)]*\)\s*=\s*\d+$/i.test(s))return true;
+    if(n==='rob'||n==='rob catalyst'||n==='rm7')return true;
+    if(n.includes('plan tarik'))return true;
+    if(n==='taipanco yard'||n==='warehouse')return true;
+    // MDB and DPBMC styles are colour codes, not order numbers. NC style remains Order No.
+    if(/^(MDB[A-Z0-9-]{3,}|DPBMC)$/i.test(s))return true;
+    return false;
+  }
+  function isColourCodeLine123(x){
+    let s=clean(x); if(!s)return false;
+    // User-confirmed: MDBNM4-8 and DPBMC should be stored under Colour Code, not Order No.
+    return /^(MDB[A-Z0-9-]{3,}|DPBMC)$/i.test(s);
+  }
+  function isOrderNoLine123(x){
+    let s=clean(x); if(!s)return false;
+    if(isDetailOrSubPartLine123(s))return false;
+    let compact=s.replace(/[^A-Za-z0-9]/g,'');
+    if(compact.length<3)return false;
+    if(/^\d+$/.test(compact))return false;
+    return true;
+  }
+  function findNearestOrderLine123(caseRows,pos,fallback){
+    // CASE NO is the anchor. For a case row with a note instead of an order, search the surrounding case rows for the nearest valid Order No.
+    for(let k=pos;k>=0;k--){let m=caseRows[k].mark;if(isOrderNoLine123(m))return m;}
+    for(let k=pos+1;k<caseRows.length&&k<=pos+80;k++){let m=caseRows[k].mark;if(isOrderNoLine123(m))return m;}
+    return fallback||'';
+  }
+  let caseRows=[];
+  for(let i=h+1;i<rows.length;i++){
+    let r=rows[i]||[];
+    let caseNo=caseNorm123(r[cCase]);
+    if(isCaseNo123(caseNo))caseRows.push({i,r,caseNo,mark:clean(r[cMark])});
+  }
+  let currentMark='', currentColour='', blockNo=0, blockStartRow=0, lastBlockOrder='';
+  let totalCases=0;
+  let fallbackOrder=inferOrderFromModelLine123(sheetModel);
+  for(let ci=0;ci<caseRows.length;ci++){
+    let item=caseRows[ci], i=item.i, r=item.r, caseNo=item.caseNo;
+    let mark=item.mark;
+    let markNote='';
+    if(mark){
+      if(isColourCodeLine123(mark)){
+        currentColour=mark;
+        markNote=mark;
+      }else if(isOrderNoLine123(mark)){
+        currentMark=mark;
+        if(currentMark!==lastBlockOrder){blockNo++;blockStartRow=i+1;lastBlockOrder=currentMark;}
+      }else{
+        markNote=mark;
+      }
+    }
+    // Safety repair: if the row has CASE NO but no clean Order No yet, resolve from nearest valid Order No around that CASE NO.
+    if(!isOrderNoLine123(currentMark)){
+      currentMark=findNearestOrderLine123(caseRows,ci,fallbackOrder);
+      if(currentMark&&currentMark!==lastBlockOrder){blockNo++;blockStartRow=i+1;lastBlockOrder=currentMark;}
+    }
+    if(!blockNo){blockNo=1; blockStartRow=i+1;}
+    let dr=dval(r[cRec]), du=dval(r[cUse]);
+    let st=du?'Used':(dr?'In Stock':'Not Received');
+    let seq=clean(r[cSeq]);
+    let remarks=[head[cSeq]&&head[cSeq].includes('remark')?seq:'',markNote].filter(Boolean).join(' | ');
+    totalCases++;
+    o.lineCases.push({vendor:meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:sheet,modelFull:sheetModel,modelName:sheetModel,colourCode:currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:caseNo.slice(0,3),blockCaseFrom:caseNo.slice(3),blockCaseTo:caseNo.slice(3),blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:currentMark,caseNo,lotNo:caseNo.slice(0,3),caseSeq:caseNo.slice(3),dateReceive:dr,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,seq,status:st})
+  }
+}
+return o}
+function summary(){let lc=AppState.db.lineCases,used=lc.filter(x=>x.status==='Used').length,stock=lc.filter(x=>x.status==='In Stock').length,nr=lc.filter(x=>x.status==='Not Received').length;return{containers:AppState.db.containers.length,movements:AppState.db.movements.length,lineCases:lc.length,used,stock,nr,vendors:new Set(lc.map(x=>x.vendor)).size,models:new Set(lc.map(x=>x.modelFull)).size}}
+function renderDash(){let el=document.getElementById('dash');if(!hasData()){el.innerHTML=noData('Dashboard empty until generated');document.getElementById('stamp').textContent='No generated data';return}let s=summary();document.getElementById('stamp').textContent=`Generated ${AppState.db.generatedAt} | ${fmt(s.lineCases)} in-house cases`;el.innerHTML=`<div class="kpis"><div class="kpi"><div class="label">In-house cases</div><div class="value">${fmt(s.lineCases)}</div></div><div class="kpi"><div class="label">In stock</div><div class="value">${fmt(s.stock)}</div></div><div class="kpi"><div class="label">Used</div><div class="value">${fmt(s.used)}</div></div><div class="kpi"><div class="label">Not received</div><div class="value">${fmt(s.nr)}</div></div><div class="kpi"><div class="label">Vendors</div><div class="value">${fmt(s.vendors)}</div></div><div class="kpi"><div class="label">Models</div><div class="value">${fmt(s.models)}</div></div></div><div class="panel"><h2>Generated Sources</h2><ul>${AppState.db.sources.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`}
+function sortValue(v){return String(v??'').toLowerCase()}
+function applySort(rows,id){let st=AppState.sort[id];if(!st||!st.k)return rows;let copy=[...rows];copy.sort((a,b)=>{let av=a[st.k],bv=b[st.k];let an=Number(String(av).replace(/,/g,'')),bn=Number(String(bv).replace(/,/g,''));let cmp=(!isNaN(an)&&!isNaN(bn)&&String(av).trim()!==''&&String(bv).trim()!=='')?an-bn:sortValue(av).localeCompare(sortValue(bv),undefined,{numeric:true});return st.dir==='desc'?-cmp:cmp});return copy}
+function setSort(id,k){let st=AppState.sort[id]||{};AppState.sort[id]={k,dir:(st.k===k&&st.dir==='asc')?'desc':'asc'};renderAll();hideLoader();show(currentView())}
+function arrow(id,k){let st=AppState.sort[id]||{};return st.k===k?(st.dir==='asc'?' ▲':' ▼'):''}
+function currentView(){let b=[...document.querySelectorAll('nav button')].find(x=>x.classList.contains('active'));return b?b.dataset.v:'upload'}
+function t(rows,cols,limit=1000,id='tbl'){
+  rows=applySort(rows,id).slice(0,limit);
+  const widthMap={vendor:'90px',line:'90px',modelFull:'190px',endCode:'180px',orderNo:'170px',colourCode:'150px',caseNo:'120px',lotNo:'80px',caseSeq:'80px',dateReceive:'135px',expectedReceive:'155px',robFull:'145px',dateUse:'120px',status:'135px',seq:'80px',sourceRow:'105px',warehouse:'140px',containerNo:'150px',dateArrive:'120px',pullOutDate:'120px',model:'150px',m3:'80px',boxQty:'90px',palletQty:'90px',sourceSheet:'130px'};
+  const template=cols.map(c=>widthMap[c.k]||'130px').join(' ');
+  const header='<div class="inv-head" style="grid-template-columns:'+template+'">'+cols.map(c=>'<div class="inv-th" onclick="setSort(\''+id+'\',\''+c.k+'\')">'+c.l+arrow(id,c.k)+'</div>').join('')+'</div>';
+  const body=rows.map(r=>'<div class="inv-row" style="grid-template-columns:'+template+'">'+cols.map(c=>'<div class="inv-td">'+(c.f?c.f(r[c.k],r):esc(r[c.k]))+'</div>').join('')+'</div>').join('');
+  return '<div class="inv-scroll"><div class="inv-grid" style="min-width:'+cols.reduce((a,c)=>a+(parseInt(widthMap[c.k]||130)||130),0)+'px">'+header+body+'</div></div><p class="hint">Showing '+fmt(rows.length)+' rows.</p>'
+}
+function pill(v){return`<span class="pill ${v==='Used'?'used':v==='In Stock'?'stock':'new'}">${esc(v)}</span>`}
+function filter(rows,q){q=(q||'').toLowerCase();return q?rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q))):rows}
+function unique(rows,k){return [...new Set(rows.map(x=>x[k]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}))}
+function opt(list,val,label){return `<option value="">${label}</option>`+list.map(x=>`<option value="${esc(x)}" ${String(x)===String(val)?'selected':''}>${esc(x)}</option>`).join('')}
+function goInhouseFirst(){AppState.inhousePage=1;renderInhouse();}
+function goInhouseLast(totalPages){AppState.inhousePage=totalPages;renderInhouse();}
+function goInhousePage(dir){AppState.inhousePage=Math.max(1,AppState.inhousePage+dir);renderInhouse();}
+function resetInhouseView(){
+  AppState.showAll=false;
+  AppState.inhousePage=1;
+  ['q','ven','lineF','st','modelF','orderF','caseF'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderInhouse();
+}
+function renderInhouse(){
+  let el=document.getElementById('inhouse');
+  if(!hasData()){el.innerHTML=noData('In-house cases empty until generated');return}
+  let q=el.querySelector('#q')?.value||'',
+      v=el.querySelector('#ven')?.value||'',
+      ln=el.querySelector('#lineF')?.value||'',
+      st=el.querySelector('#st')?.value||'',
+      m=el.querySelector('#modelF')?.value||'',
+      ord=el.querySelector('#orderF')?.value||'',
+      cas=el.querySelector('#caseF')?.value||'';
+
+  function applySelected(rows,skip){
+    if(skip!=='vendor'&&v)rows=rows.filter(x=>x.vendor===v);
+    if(skip!=='line'&&ln)rows=rows.filter(x=>x.line===ln);
+    if(skip!=='modelFull'&&m)rows=rows.filter(x=>x.modelFull===m);
+    if(skip!=='orderNo'&&ord)rows=rows.filter(x=>x.orderNo===ord);
+    if(skip!=='caseNo'&&cas)rows=rows.filter(x=>x.caseNo===cas);
+    if(skip!=='status'&&st)rows=rows.filter(x=>x.status===st);
+    return rows;
+  }
+  function statusList(rows){let has=new Set(rows.map(x=>x.status).filter(Boolean));return ['In Stock','Used','Not Received'].filter(x=>has.has(x))}
+  function normalizeFilters(){
+    for(let i=0;i<6;i++){
+      let changed=false;
+      let models=unique(applySelected(AppState.db.lineCases,'modelFull'),'modelFull');if(m&&!models.includes(m)){m='';changed=true;}
+      let vendors=unique(applySelected(AppState.db.lineCases,'vendor'),'vendor');if(v&&!vendors.includes(v)){v='';changed=true;}
+      let lines=unique(applySelected(AppState.db.lineCases,'line'),'line');if(ln&&!lines.includes(ln)){ln='';changed=true;}
+      let orders=unique(applySelected(AppState.db.lineCases,'orderNo'),'orderNo');if(ord&&!orders.includes(ord)){ord='';changed=true;}
+      let cases=unique(applySelected(AppState.db.lineCases,'caseNo'),'caseNo');if(cas&&!cases.includes(cas)){cas='';changed=true;}
+      let statuses=statusList(applySelected(AppState.db.lineCases,'status'));if(st&&!statuses.includes(st)){st='';changed=true;}
+      if(!changed)break;
+    }
+  }
+  normalizeFilters();
+
+  let modelOptions=unique(applySelected(AppState.db.lineCases,'modelFull'),'modelFull');
+  let vendorOptions=unique(applySelected(AppState.db.lineCases,'vendor'),'vendor');
+  let lineOptions=unique(applySelected(AppState.db.lineCases,'line'),'line');
+  let orderOptions=unique(applySelected(AppState.db.lineCases,'orderNo'),'orderNo');
+  let caseOptions=unique(applySelected(AppState.db.lineCases,'caseNo'),'caseNo');
+  let statusOptions=statusList(applySelected(AppState.db.lineCases,'status'));
+  let rows=filter(applySelected(AppState.db.lineCases,null),q);
+
+  let filteredActive=q||v||ln||st||m||ord||cas||AppState.showAll;
+  let totalRows=rows.length;
+  let start=(AppState.inhousePage-1)*AppState.inhousePageSize;
+  let totalPages=Math.max(1,Math.ceil(totalRows/AppState.inhousePageSize));
+  if(AppState.inhousePage>totalPages){AppState.inhousePage=1;start=0;}
+  let pageRows=rows.slice(start,start+AppState.inhousePageSize);
+  el.innerHTML=`<div class="panel"><h2>In-House Inventory</h2><div class="notice"><b>Smart filter view:</b> Every filter now follows the others. Example: choose Model <b>2WB 7 BODY PART</b>, then Vendor, Line, Order No and Case No only show related values.</div><div class="toolbar"><select id="modelF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(modelOptions,m,'Filter Model')}</select><select id="ven" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(vendorOptions,v,'All vendors')}</select><select id="lineF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(lineOptions,ln,'All lines')}</select><select id="orderF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(orderOptions,ord,'Filter Order No')}</select><select id="caseF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(caseOptions,cas,'Filter Case No')}</select><select id="st" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><input id="q" placeholder="Search model, order, case, colour..." value="${esc(q)}" oninput="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><button class="btn secondary" onclick="AppState.showAll=true;AppState.inhousePage=1;renderInhouse()">Show All</button><button class="btn secondary" onclick="resetInhouseView()">Reset View</button><button class="btn secondary" onclick="csvRows('inhouse-filtered.csv',getInhouseFiltered())">Export Filtered CSV</button></div><p class="hint">Cascading filters are generated from the uploaded data. Selecting any Model, Vendor, Line, Order No, Case No, or Status will immediately narrow the remaining filter lists.</p>${filteredActive?(t(pageRows,[{k:'vendor',l:'Vendor'},{k:'line',l:'Line'},{k:'modelFull',l:'Model'},{k:'endCode',l:'Sheet'},{k:'orderNo',l:'Order No'},{k:'colourCode',l:'Colour Code'},{k:'caseNo',l:'Case No'},{k:'lotNo',l:'Lot'},{k:'caseSeq',l:'Case'},{k:'dateReceive',l:'Actual Receive'},{k:'expectedReceive',l:'Expected Receive'},{k:'robFull',l:'R/F'},{k:'dateUse',l:'Date Use'},{k:'status',l:'Status',f:pill},{k:'seq',l:'SEQ'},{k:'sourceRow',l:'Excel Row'}],10000,'inhouse')+`<div class='toolbar'><button class='btn secondary' onclick='goInhouseFirst()'>First</button><button class='btn secondary' onclick='goInhousePage(-1)'>Previous</button><span>Page ${AppState.inhousePage} of ${totalPages}</span><button class='btn secondary' onclick='goInhousePage(1)'>Next</button><button class='btn secondary' onclick='goInhouseLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 5,000 rows (updated for better performance).</p>`):'<div class="empty"><div><h2>Select a filter to list data</h2><p class="hint">Choose Model, Vendor, Line, Order No, Case No, or use Show All. This keeps the page fast and focused.</p></div></div>'}</div>`
+
+}
+function getInhouseFiltered(){
+  let q=document.getElementById('q')?.value||'',
+      v=document.getElementById('ven')?.value||'',
+      ln=document.getElementById('lineF')?.value||'',
+      st=document.getElementById('st')?.value||'',
+      m=document.getElementById('modelF')?.value||'',
+      ord=document.getElementById('orderF')?.value||'',
+      cas=document.getElementById('caseF')?.value||'';
+  let rows=AppState.db.lineCases;
+  if(v)rows=rows.filter(x=>x.vendor===v);
+  if(ln)rows=rows.filter(x=>x.line===ln);
+  if(m)rows=rows.filter(x=>x.modelFull===m);
+  if(ord)rows=rows.filter(x=>x.orderNo===ord);
+  if(cas)rows=rows.filter(x=>x.caseNo===cas);
+  if(st)rows=rows.filter(x=>x.status===st);
+  return filter(rows,q)
+}
+function orderBlockRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.sourceSheet,x.orderNo,x.blockNo,x.blockStartRow].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,modelName:x.modelName,colourCode:x.colourCode,blockNo:x.blockNo,blockStartRow:x.blockStartRow,lotNo:x.blockLotNo,caseFrom:x.blockCaseFrom,caseTo:x.blockCaseTo,total:0,received:0,used:0,stock:0,notReceived:0,pullInDate:x.blockPullInDate,remarks:x.remarks};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
+function lotRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.modelFull,x.endCode,x.orderNo,x.colourCode,x.lotNo].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,colourCode:x.colourCode,lotNo:x.lotNo,total:0,received:0,used:0,stock:0,notReceived:0};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
+function renderExternal(){let el=document.getElementById('external');if(!hasData()){el.innerHTML=noData('External warehouse empty until generated');return}let q=el.querySelector('#eq')?.value||'';let rows=filter(AppState.db.containers,q);el.innerHTML=`<div class="panel"><h2>External Warehouse</h2><div class="toolbar"><input id="eq" placeholder="Search container, model..." value="${esc(q)}" oninput="renderExternal()"><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export CSV</button></div>${t(rows,[{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'dateArrive',l:'Arrive'},{k:'dateReceive',l:'Receive/Unstuff'},{k:'pullOutDate',l:'Pull Out'},{k:'model',l:'Model'},{k:'m3',l:'M3'},{k:'boxQty',l:'Boxes'},{k:'palletQty',l:'Pallets'},{k:'sourceSheet',l:'Sheet'}],1000,'external')}</div>`}
+function renderLedger(){let el=document.getElementById('ledger');if(!hasData()){el.innerHTML=noData('Movement ledger empty until generated');return}let q=el.querySelector('#mq')?.value||'';let rows=filter(AppState.db.movements,q);el.innerHTML=`<div class="panel"><h2>Movement Ledger</h2><div class="toolbar"><input id="mq" placeholder="Search invoice, model, container..." value="${esc(q)}" oninput="renderLedger()"><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export CSV</button></div>${t(rows,[{k:'date',l:'Date'},{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'invoiceNo',l:'Invoice'},{k:'caseMarkOrderNo',l:'Order/Case Mark'},{k:'model',l:'Model'},{k:'caseIn',l:'Case In'},{k:'caseOut',l:'Case Out'},{k:'balance',l:'Balance'},{k:'location',l:'Location'}],1000,'ledger')}</div>`}
+function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',AppState.db.lineCases)">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data</button></div><p class="hint">Use filtered views first for daily checking. Use CSV exports for Power BI, Excel pivot, ERP upload foundation, or audit backup.</p></div>`}
+function toCSV(rows){if(!rows.length)return'';let ks=Object.keys(rows[0]);return ks.join(',')+'\n'+rows.map(r=>ks.map(k=>'"'+String(r[k]??'').replaceAll('"','""')+'"').join(',')).join('\n')}
+function download(n,t,mime='text/csv'){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:mime}));a.download=n;a.click();URL.revokeObjectURL(a.href)}
+function csvRows(n,rows){download(n,toCSV(rows),'text/csv')}
+function exportJSON(){download('yamaha-inventory-backup.json',JSON.stringify(AppState.db,null,2),'application/json')}
+function clearAll(){AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;renderAll();hideLoader();show('upload')}
+function renderAll(){renderUpload();renderInhouse();renderExternal();renderSettings()}
+renderAll();hideLoader();
+</script>
+</body></html>
