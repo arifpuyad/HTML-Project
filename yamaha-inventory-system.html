@@ -155,6 +155,8 @@ const MAX_FILE_SIZE=1024*1024*1024;// 1GB limit
 // Pre-compiled regex patterns for better performance
 const REGEX_VENDOR=/YMCN|YIMM|YMVN|TYM|IYM|YMC/i;
 const REGEX_CONTAINER_VENDOR=/-\s*([A-Z0-9]+)\s*-(?:\s*[A-Z]+)?\s*LINE\s*(\d+)/i;
+const SAFETY_RULES={strict:true,clearPhrase:'CLEAR ALL',regeneratePhrase:'REGENERATE'};
+const SAFETY_BACKUP_KEY='yamaha-inventory-latest-backup';
 // ==================== UTILITY FUNCTIONS ====================
 /**
  * Creates an empty database structure
@@ -185,6 +187,23 @@ function showLoader(msg){var o=document.getElementById("loadingOverlay");if(o){o
  * Hides the loading overlay
  */
 function hideLoader(){var o=document.getElementById("loadingOverlay");if(o)o.style.display="none";}
+function safetyLog(msg){var log=document.getElementById('log');if(log)log.innerHTML='<div class="notice bad"><b>Safety rule:</b> '+esc(msg)+'</div>';}
+function createSafetyBackup(reason){
+  if(!hasData())return true;
+  try{
+    localStorage.setItem(SAFETY_BACKUP_KEY,JSON.stringify({reason:reason||'manual',savedAt:new Date().toISOString(),db:AppState.db}));
+    return true;
+  }catch(e){
+    safetyLog('Backup failed. Destructive action is blocked to protect your data.');
+    return false;
+  }
+}
+function requireSafetyConfirmation(actionLabel,phrase){
+  if(!SAFETY_RULES.strict)return true;
+  var input=window.prompt(actionLabel+' confirmation required. Type "'+phrase+'" to continue.','');
+  if(input!==phrase){safetyLog(actionLabel+' cancelled. Confirmation text did not match.');return false;}
+  return true;
+}
 // Global error handler
 window.addEventListener('error',function(e){var log=document.getElementById('log');if(log){log.innerHTML='<div class="notice bad"><b>Script error:</b> '+(e.message||'Unknown error')+'</div>';}});
 // Single event listener for all button clicks to show loader (consolidated from 4 duplicate listeners)
@@ -228,7 +247,27 @@ function noData(t){return`<div class="empty"><div><h2>${t}</h2><p class="hint">U
 function show(v){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.v===v));document.querySelectorAll('.view').forEach(x=>x.hidden=true);document.getElementById(v).hidden=false}
 document.getElementById('nav').onclick=e=>{if(e.target.tagName==='BUTTON')show(e.target.dataset.v)};
 function renderUpload(){let f=t=>AppState.files[t].map((x,i)=>(t==='line'||t==='line123')?`${esc(x.name)} <button class="btn secondary mini" onclick="removeLineFile('${t}',${i})">Remove</button>`:esc(x.name)).join('<br>')||'No file selected';document.getElementById('upload').innerHTML=`<div class="panel"><div style="display:flex;align-items:center;gap:14px;margin-bottom:16px"><img src="yamaha-badge.png" alt="Yamaha badge" style="width:44px;height:44px;display:block;border-radius:50%;border:1px solid #d8e0ea;background:#fff;object-fit:cover"><h2 style="margin:0">Upload & Generate Inventory</h2></div><div class="notice ok"><b>Professional view:</b> Upload your reports, then use Model, Order No and Case No filters. Click any table header to sort A-Z or Z-A.</div><div class="grid3"><div class="drop"><b>Toll Global IN/OUT</b><p class="hint">Sheets: INBOUND and OUTBOUND.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'toll')"><p class="hint">${f('toll')}</p></div><div class="drop"><b>Koike Incoming</b><p class="hint">Visible monthly sheets only. Hidden sheets are skipped.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'koike')"><p class="hint">${f('koike')}</p></div><div class="drop"><b>In-House Line 4</b><p class="hint">Multiple upload is enabled. Add Line 4 files such as YIMM, YMVN, TYM together or one by one.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'line');this.value=''"><div class="toolbar" style="margin:8px 0"><button class="btn secondary" onclick="clearType('line')">Clear Line 4 files</button></div><p class="hint"><b>Selected Line 4 files:</b><br>${f('line')}</p></div><div class="drop"><b>In-House Line 1,2,3</b><p class="hint">Upload Instant Warehouse Record files. Vendor is detected from filename: YIMM, VIETNAM/YMVN, TYM, or CKD/YMC. These records appear as Line 1,2,3.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'line123');this.value=''"><div class="toolbar" style="margin:8px 0"><button class="btn secondary" onclick="clearType('line123')">Clear Line 1,2,3 files</button></div><p class="hint"><b>Selected Line 1,2,3 files:</b><br>${f('line123')}</p></div></div><div class="toolbar"><button class="btn green" onclick="generate()">Generate Inventory</button><button class="btn danger" onclick="clearAll()">Clear</button><button class="btn secondary" onclick="exportJSON()">Export JSON</button></div><div id="log" class="hint"></div><noscript><div class="notice bad">JavaScript is blocked. Download the HTML and open locally in Microsoft Edge or Chrome.</div></noscript></div>`}
-async function generate(){showLoader("Generating inventory from uploaded files...");try{await ensureXLSX()}catch(e){document.getElementById('log').innerHTML='<div class="notice bad"><b>Excel parser not loaded:</b> '+e.message+'</div>';return}if(!AppState.files.toll.length&&!AppState.files.koike.length&&!AppState.files.line.length){document.getElementById('log').innerHTML='<div class="notice bad">Select at least one report file.</div>';return}AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;let msgs=[];let total=['toll','koike','line','line123'].reduce((a,t)=>a+AppState.files[t].length,0);let done=0;for(let type of ['toll','koike','line','line123'])for(let file of AppState.files[type]){updateGenProgress((done/Math.max(total,1))*100,'Reading '+file.name);try{let r=await readWorkbook(file,type);msgs.push(`${file.name}: ${r.containers} containers, ${r.movements} movements, ${r.lineCases} in-house cases${r.hidden?`, ${r.hidden} hidden sheet(s) skipped`:''}`);AppState.db.sources.push(file.name);done++;updateGenProgress((done/Math.max(total,1))*100,'Processed '+file.name)}catch(e){msgs.push(`${file.name}: ERROR ${e.message}`)}}AppState.db.generatedAt=new Date().toLocaleString();renderAll();hideLoader();show('inhouse');let log=document.getElementById('log');if(log)log.innerHTML='<div class="notice ok"><b>Generated.</b><br>'+msgs.map(esc).join('<br>')+'</div>'}
+async function generate(){
+  showLoader("Generating inventory from uploaded files...");
+  try{await ensureXLSX()}catch(e){document.getElementById('log').innerHTML='<div class="notice bad"><b>Excel parser not loaded:</b> '+e.message+'</div>';return}
+  if(!AppState.files.toll.length&&!AppState.files.koike.length&&!AppState.files.line.length){document.getElementById('log').innerHTML='<div class="notice bad">Select at least one report file.</div>';return}
+  if(hasData()){
+    if(!requireSafetyConfirmation('Regenerate inventory',SAFETY_RULES.regeneratePhrase)){hideLoader();return}
+    if(!createSafetyBackup('regenerate')){hideLoader();return}
+  }
+  AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;
+  let msgs=[];let total=['toll','koike','line','line123'].reduce((a,t)=>a+AppState.files[t].length,0);let done=0;
+  for(let type of ['toll','koike','line','line123'])for(let file of AppState.files[type]){
+    updateGenProgress((done/Math.max(total,1))*100,'Reading '+file.name);
+    try{
+      let r=await readWorkbook(file,type);
+      msgs.push(`${file.name}: ${r.containers} containers, ${r.movements} movements, ${r.lineCases} in-house cases${r.hidden?`, ${r.hidden} hidden sheet(s) skipped`:''}`);
+      AppState.db.sources.push(file.name);done++;updateGenProgress((done/Math.max(total,1))*100,'Processed '+file.name)
+    }catch(e){msgs.push(`${file.name}: ERROR ${e.message}`)}
+  }
+  AppState.db.generatedAt=new Date().toLocaleString();renderAll();hideLoader();show('inhouse');
+  let log=document.getElementById('log');if(log)log.innerHTML='<div class="notice ok"><b>Generated.</b><br>'+msgs.map(esc).join('<br>')+'</div>'
+}
 function readWorkbook(file,type){return new Promise((res,rej)=>{let fr=new FileReader();fr.onerror=()=>rej(new Error('cannot read file'));fr.onload=e=>{try{let wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});let out={containers:0,movements:0,lineCases:0,hidden:0};wb.SheetNames.forEach((name,i)=>{let meta=wb.Workbook&&wb.Workbook.Sheets?wb.Workbook.Sheets[i]:null;if(meta&&meta.Hidden){out.hidden++;return}let rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:'',raw:false});let x=transform(rows,type,name,file.name);AppState.db.containers.push(...x.containers);AppState.db.movements.push(...x.movements);AppState.db.lineCases.push(...x.lineCases);out.containers+=x.containers.length;out.movements+=x.movements.length;out.lineCases+=x.lineCases.length});res(out)}catch(err){rej(err)}};fr.readAsArrayBuffer(file)})}
 function findHeader(rows,words){for(let i=0;i<Math.min(rows.length,30);i++){let j=rows[i].join('|').toLowerCase();if(words.every(w=>j.includes(w.toLowerCase())))return i}return 0}
 function idx(h,names){for(let nm of names){let j=h.findIndex(x=>x.includes(norm(nm)));if(j>=0)return j}return -1}
@@ -525,12 +564,16 @@ function orderBlockRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.ve
 function lotRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.modelFull,x.endCode,x.orderNo,x.colourCode,x.lotNo].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,colourCode:x.colourCode,lotNo:x.lotNo,total:0,received:0,used:0,stock:0,notReceived:0};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
 function renderExternal(){let el=document.getElementById('external');if(!hasData()){el.innerHTML=noData('External warehouse empty until generated');return}let q=el.querySelector('#eq')?.value||'';let rows=filter(AppState.db.containers,q);el.innerHTML=`<div class="panel"><h2>External Warehouse</h2><div class="toolbar"><input id="eq" placeholder="Search container, model..." value="${esc(q)}" oninput="renderExternal()"><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export CSV</button></div>${t(rows,[{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'dateArrive',l:'Arrive'},{k:'dateReceive',l:'Receive/Unstuff'},{k:'pullOutDate',l:'Pull Out'},{k:'model',l:'Model'},{k:'m3',l:'M3'},{k:'boxQty',l:'Boxes'},{k:'palletQty',l:'Pallets'},{k:'sourceSheet',l:'Sheet'}],1000,'external')}</div>`}
 function renderLedger(){let el=document.getElementById('ledger');if(!hasData()){el.innerHTML=noData('Movement ledger empty until generated');return}let q=el.querySelector('#mq')?.value||'';let rows=filter(AppState.db.movements,q);el.innerHTML=`<div class="panel"><h2>Movement Ledger</h2><div class="toolbar"><input id="mq" placeholder="Search invoice, model, container..." value="${esc(q)}" oninput="renderLedger()"><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export CSV</button></div>${t(rows,[{k:'date',l:'Date'},{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'invoiceNo',l:'Invoice'},{k:'caseMarkOrderNo',l:'Order/Case Mark'},{k:'model',l:'Model'},{k:'caseIn',l:'Case In'},{k:'caseOut',l:'Case Out'},{k:'balance',l:'Balance'},{k:'location',l:'Location'}],1000,'ledger')}</div>`}
-function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',AppState.db.lineCases)">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data</button></div><p class="hint">Use filtered views first for daily checking. Use CSV exports for Power BI, Excel pivot, ERP upload foundation, or audit backup.</p></div>`}
+function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',AppState.db.lineCases)">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data (Strict Rule)</button></div><p class="hint">Strict safety rule is active. Regenerate and Clear require exact confirmation text and automatic backup.</p></div>`}
 function toCSV(rows){if(!rows.length)return'';let ks=Object.keys(rows[0]);return ks.join(',')+'\n'+rows.map(r=>ks.map(k=>'"'+String(r[k]??'').replaceAll('"','""')+'"').join(',')).join('\n')}
 function download(n,t,mime='text/csv'){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:mime}));a.download=n;a.click();URL.revokeObjectURL(a.href)}
 function csvRows(n,rows){download(n,toCSV(rows),'text/csv')}
 function exportJSON(){download('yamaha-inventory-backup.json',JSON.stringify(AppState.db,null,2),'application/json')}
-function clearAll(){AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;renderAll();hideLoader();show('upload')}
+function clearAll(){
+  if(!requireSafetyConfirmation('Clear generated data',SAFETY_RULES.clearPhrase))return;
+  if(!createSafetyBackup('clear-all'))return;
+  AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;renderAll();hideLoader();show('upload')
+}
 function renderAll(){renderUpload();renderInhouse();renderExternal();renderSettings()}
 renderAll();hideLoader();
 </script>
