@@ -304,6 +304,8 @@ function parseInventoryDate(v){
         return isNaN(d)?null:d;
       }
     }
+    // Reject plain integers like "1" to avoid false-positive date parsing.
+    if(/^\d+$/.test(v))return null;
     let m=v.match(/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})$/);
     if(m){
       let d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
@@ -314,6 +316,16 @@ function parseInventoryDate(v){
       let d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));
       return isNaN(d)?null:d;
     }
+    // e.g. 18-Dec, 18-Dec-24, 18 Dec 2024
+    m=v.match(/^(\d{1,2})[\s\-\/\.]([A-Za-z]{3,9})(?:[\s\-\/\.](\d{2,4}))?$/);
+    if(m){
+      let y=m[3]?Number(m[3]):new Date().getFullYear();
+      if(y<100)y+=2000;
+      let d=new Date(`${m[1]} ${m[2]} ${y}`);
+      return isNaN(d)?null:d;
+    }
+    // Guard generic parser: require date-like separators or month words.
+    if(!(/[A-Za-z]/.test(v)||/[\/\-.]/.test(v)))return null;
     let d=new Date(v);
     return isNaN(d)?null:d;
   }catch(e){
@@ -540,6 +552,7 @@ if(type==='koike'){
     }
     let recFromHeader=cRec>=0;
     let useFromHeader=cUse>=0;
+    let lotFromHeader=cLot>=0;
     if(cRec<0)cRec=3;
     if(cUse<0)cUse=5;
     let recScore=scanColumnScore(hCase+1,cRec,function(v){return !!parseInventoryDate(v)});
@@ -558,23 +571,17 @@ if(type==='koike'){
       let dateColB={col:cUse,score:scanColumnScore(hCase+1,cUse,function(v){return !!parseInventoryDate(v)})};
       if(dateColB.score>dateColA.score){let t=cRec;cRec=cUse;cUse=t;}
     }
-    let lotScore=scanColumnScore(hCase+1,cLot,function(v){
+    function isLotLikeKoike(v){
       let s=clean(v);
       if(!s||headerLikeKoike(s))return false;
       if(parseInventoryDate(s))return false;
-      if(/^\d{3}$/.test(s))return true;
-      if(/^[A-Z0-9]{2,6}$/i.test(s)&&!(/^[A-Z]{1,2}\d{1,2}$/i.test(s)))return true;
+      if(/^\d{3,6}$/.test(s))return true;
+      if(/^[A-Z0-9]{2,8}$/i.test(s)&&/\d/.test(s)&&!(/^[A-Z]{1,2}\d{1,2}$/i.test(s)))return true;
       return false;
-    });
-    if(cLot<0||lotScore===0){
-      let foundLot=findBestColumn(hCase+1,function(v){
-        let s=clean(v);
-        if(!s||headerLikeKoike(s))return false;
-        if(parseInventoryDate(s))return false;
-        if(/^\d{3}$/.test(s))return true;
-        if(/^[A-Z0-9]{2,6}$/i.test(s)&&!(/^[A-Z]{1,2}\d{1,2}$/i.test(s)))return true;
-        return false;
-      },protectedCols.concat([cCase,cRec,cUse]));
+    }
+    let lotScore=scanColumnScore(hCase+1,cLot,function(v){return isLotLikeKoike(v)});
+    if((!lotFromHeader)&&(cLot<0||lotScore===0)){
+      let foundLot=findBestColumn(hCase+1,function(v){return isLotLikeKoike(v)},protectedCols.concat([cCase,cRec,cUse]));
       if(foundLot.score>0)cLot=foundLot.col;
     }
     let caseRows=[];
@@ -631,7 +638,7 @@ if(type==='koike'){
     for(let ci=0;ci<caseRows.length;ci++){
       let item=caseRows[ci],i=item.i,r=item.r,caseNo=item.caseNo;
       let lotPart=clean(item.lotText);
-      if(!lotPart&&/^\d{6}$/.test(caseNo))lotPart=caseNo.slice(0,3);
+      if(!lotPart&&!lotFromHeader&&/^\d{6}$/.test(caseNo))lotPart=caseNo.slice(0,3);
       let seqPart=/^\d{6}$/.test(caseNo)?caseNo.slice(3):'';
       let caseDisplay=/^\d{6}$/.test(caseNo)?caseNo:(item.rawCaseText||caseNo);
       let mark=item.mark;
@@ -653,10 +660,10 @@ if(type==='koike'){
       }
       if(!blockNo){blockNo=1;blockStartRow=i+1;}
       let drRaw=dval(r[cRec]),duRaw=dval(r[cUse]);
-      if(!parseInventoryDate(drRaw)||!parseInventoryDate(duRaw)){
+      if((!recFromHeader&&!parseInventoryDate(drRaw))||(!useFromHeader&&!parseInventoryDate(duRaw))){
         let rowDates=pickRowDates(r);
-        if((!parseInventoryDate(drRaw))&&rowDates.length>0)drRaw=rowDates[0];
-        if((!parseInventoryDate(duRaw))&&rowDates.length>1)duRaw=rowDates[rowDates.length-1];
+        if((!recFromHeader&&!parseInventoryDate(drRaw))&&rowDates.length>0)drRaw=rowDates[0];
+        if((!useFromHeader&&!parseInventoryDate(duRaw))&&rowDates.length>1)duRaw=rowDates[rowDates.length-1];
       }
       let dr=parseInventoryDate(drRaw)?drRaw:'';
       let du=parseInventoryDate(duRaw)?duRaw:'';
