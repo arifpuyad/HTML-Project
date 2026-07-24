@@ -381,7 +381,7 @@ if(type==='koike'){
     let best=-1,bestScore=-1,limit=Math.min(rows.length,80);
     for(let hi=0;hi<limit;hi++){
       let hrow=(rows[hi]||[]).map(norm);
-      let hasCase=idx(hrow,['case no','case number','case no.','case #'])>=0;
+      let hasCase=idx(hrow,['case no','case number','case no.','case #','case'])>=0;
       let score=0;
       if(idx(hrow,['warehouse','location','wh'])>=0)score+=3;
       if(idx(hrow,['marking no','mark no','marking'])>=0)score+=2;
@@ -401,7 +401,7 @@ if(type==='koike'){
   let hCase=headerHit.row;
   if(hCase<0)hCase=findHeader(rows,['case no']);
   let headCase=(rows[hCase]||[]).map(norm);
-  let cCase=idx(headCase,['case no','case number','case no.','case #']);
+  let cCase=idx(headCase,['case no','case number','case no.','case #','case']);
   // New KOIKE compatibility: if a CASE NO structure is detected, map it into master (in-house) records.
   if(cCase>=0 || headerHit.score>=5){
     let cMark=idx(headCase,['marking no','mark no','marking']); if(cMark<0)cMark=1;
@@ -490,7 +490,7 @@ if(type==='koike'){
     }
     function headerLikeKoike(x){
       let n=norm(x);
-      return n==='warehouse'||n==='warehouse location'||n==='location'||n==='vendor'||n==='mark no'||n==='marking no'||n==='model'||n==='factory'||n==='fac'||n==='set code'||n==='colour code'||n==='color code'||n==='case no'||n==='case number'||n==='receive'||n==='received'||n==='send to hlym'||n==='pull out hlym'||n==='pull out date'||n==='lot'||n==='lot no'||n==='lot number';
+      return n==='warehouse'||n==='warehouse location'||n==='location'||n==='vendor'||n==='mark no'||n==='marking no'||n==='model'||n==='factory'||n==='fac'||n==='set code'||n==='colour code'||n==='color code'||n==='case'||n==='case no'||n==='case number'||n==='receive'||n==='received'||n==='send to hlym'||n==='pull out hlym'||n==='pull out date'||n==='lot'||n==='lot no'||n==='lot number';
     }
     function cleanWarehouseKoike(x){
       let s=clean(x);
@@ -534,7 +534,7 @@ if(type==='koike'){
       }
       return best;
     }
-    let strictCaseColumn=(idx(headCase,['case no','case number','case no.','case #'])>=0);
+    let strictCaseColumn=(idx(headCase,['case no','case number','case no.','case #','case'])>=0);
     function pickRowDates(row){
       let out=[];
       let cols=(row||[]).length;
