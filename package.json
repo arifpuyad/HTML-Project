@@ -1,0 +1,9 @@
+{
+  "name": "yamaha-inventory-system",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-app.ps1",
+    "run": "powershell -NoProfile -ExecutionPolicy Bypass -File .\\run-app.ps1"
+  }
+}
