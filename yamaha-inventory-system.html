@@ -356,25 +356,29 @@ function vendorFromInstant(name,rows){
 }
 function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[],lineCases:[]};if(type==='toll'){let h=findHeader(rows,['Container']);let head=rows[h].map(norm);let c=idx(head,['container']);if(c<0)c=2;let inbound=sheet.toLowerCase().includes('inbound')||idx(head,['no. of box'])>=0;if(inbound){for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;o.containers.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,containerNo:clean(r[c]).toUpperCase(),dateArrive:dval(r[idx(head,['date arrive'])]),dateReceive:dval(r[idx(head,['date receive'])]),origin:clean(r[idx(head,['origin'])]),m3:num(r[idx(head,['m3'])]),boxQty:num(r[idx(head,['no. of box'])]),palletQty:0})}}else{for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;let b=num(r[idx(head,['balance'])]);o.movements.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,date:dval(r[idx(head,['date offloading'])])||dval(r[idx(head,['date arrive'])]),containerNo:clean(r[c]).toUpperCase(),invoiceNo:clean(r[idx(head,['invoice no'])]),caseMarkOrderNo:clean(r[idx(head,['case mark order no'])]),model:clean(r[idx(head,['modal'])]),caseIn:clean(r[idx(head,['case in'])]),caseOut:clean(r[idx(head,['case out'])]),balance:b,location:clean(r[idx(head,['location'])]),status:b>0?'Open':'Closed'})}}}
 if(type==='koike'){
-  let hCase=findHeader(rows,['case no']);
+  function findKoikeHeaderRow(rows){
+    let best=-1,bestScore=-1,limit=Math.min(rows.length,80);
+    for(let hi=0;hi<limit;hi++){
+      let hrow=(rows[hi]||[]).map(norm);
+      let hasCase=idx(hrow,['case no','case number','case no.','case #'])>=0;
+      if(!hasCase)continue;
+      let score=0;
+      if(idx(hrow,['warehouse','location','wh'])>=0)score+=3;
+      if(idx(hrow,['marking no','mark no','marking'])>=0)score+=2;
+      if(idx(hrow,['model','part model'])>=0)score+=2;
+      if(idx(hrow,['factory','plant','country'])>=0)score+=1;
+      if(idx(hrow,['set code','setcode','set'])>=0)score+=1;
+      if(idx(hrow,['colour code','color code','colour','color'])>=0)score+=1;
+      if(idx(hrow,['receive','rec date','date receive'])>=0)score+=2;
+      if(idx(hrow,['send to hlym','to hlym','to f3','date back to f3'])>=0)score+=2;
+      if(score>bestScore){bestScore=score;best=hi;}
+    }
+    return best;
+  }
+  let hCase=findKoikeHeaderRow(rows);
+  if(hCase<0)hCase=findHeader(rows,['case no']);
   let headCase=(rows[hCase]||[]).map(norm);
   let cCase=idx(headCase,['case no','case number','case no.','case #']);
-  if(cCase<0){
-    for(let hi=0;hi<Math.min(rows.length,50);hi++){
-      let hrow=(rows[hi]||[]).map(norm);
-      let score=0;
-      let hasCase=idx(hrow,['case no','case number','case no.','case #'])>=0;
-      if(idx(hrow,['warehouse','location'])>=0)score++;
-      if(idx(hrow,['marking no','mark no','marking'])>=0)score++;
-      if(idx(hrow,['model','part model'])>=0)score++;
-      if(idx(hrow,['factory','plant','country'])>=0)score++;
-      if(idx(hrow,['set code','setcode','set'])>=0)score++;
-      if(idx(hrow,['colour code','color code','colour','color'])>=0)score++;
-      if(hasCase)score++;
-      if(idx(hrow,['receive','rec date','date receive'])>=0)score++;
-      if(hasCase&&score>=3){hCase=hi;headCase=(rows[hCase]||[]).map(norm);cCase=idx(headCase,['case no','case number','case no.','case #']);break}
-    }
-  }
   // New KOIKE compatibility: if a CASE NO structure is detected, map it into master (in-house) records.
   if(cCase>=0){
     let cMark=idx(headCase,['marking no','mark no','marking']); if(cMark<0)cMark=1;
@@ -834,36 +838,19 @@ function koikeViewRows(){
         sourceSheet:clean(x.sourceSheet)
       };
     });
-  if(detailRows.length)return detailRows;
-  return AppState.db.containers
-    .filter(function(x){return x.warehouse==='Koike';})
-    .map(function(x){
-      return{
-        inventoryStatus:koikeStatus(x),
-        warehouseLocation:clean(x.containerNo).replace(/^warehouse\s*/i,'').toUpperCase(),
-        vendor:'KOIKE',
-        markNo:clean(x.caseMark),
-        model:clean(x.model),
-        factory:clean(x.country),
-        setCode:clean(x.sizeType),
-        colourCode:'',
-        lotNumber:'',
-        caseNumber:'',
-        receiveInfo:clean(x.dateReceive),
-        sendToHlym:clean(x.pullOutDate),
-        sourceSheet:clean(x.sourceSheet)
-      };
-    });
+  return detailRows;
 }
 function renderKoike(){
   let el=document.getElementById('koike');
   if(!hasData()){el.innerHTML=noData('KOIKE inventory empty until generated');return}
   let q=el.querySelector('#kq')?.value||'';
   let st=el.querySelector('#kst')?.value||'';
-  let rows=koikeViewRows();
+  let baseRows=koikeViewRows();
+  let rows=baseRows;
   if(st)rows=rows.filter(x=>x.inventoryStatus===st);
   rows=filter(rows,q);
-  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div><div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-inventory.csv',filter((document.getElementById('kst')?.value?koikeViewRows().filter(x=>x.inventoryStatus===document.getElementById('kst')?.value):koikeViewRows()),document.getElementById('kq')?.value||''))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Number'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
+  let emptyHint=baseRows.length?'' : '<div class="notice bad"><b>No KOIKE detail rows parsed.</b><br>Please upload the KOIKE detail file that contains CASE NO and Receive/Send date columns.</div>';
+  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div>${emptyHint}<div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-inventory.csv',filter((document.getElementById('kst')?.value?koikeViewRows().filter(x=>x.inventoryStatus===document.getElementById('kst')?.value):koikeViewRows()),document.getElementById('kq')?.value||''))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Number'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
 }
 function renderToll(){
   let el=document.getElementById('toll');
