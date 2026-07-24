@@ -1000,24 +1000,40 @@ function renderKoike(){
   let mk=el.querySelector('#kmark')?.value||'';
   let loc=el.querySelector('#kloc')?.value||'';
   let baseRows=koikeViewRows();
-  let vendorOptions=unique(baseRows,'vendor');
-  let modelOptions=unique(baseRows,'model');
-  let markOptions=unique(baseRows,'markNo');
-  let locationOptions=unique(baseRows,'warehouseLocation');
-  let rows=baseRows;
-  if(st)rows=rows.filter(x=>x.inventoryStatus===st);
-  if(v)rows=rows.filter(x=>x.vendor===v);
-  if(m)rows=rows.filter(x=>x.model===m);
-  if(mk)rows=rows.filter(x=>x.markNo===mk);
-  if(loc)rows=rows.filter(x=>x.warehouseLocation===loc);
-  rows=filter(rows,q);
+  function applySelected(rows,skip){
+    if(skip!=='status'&&st)rows=rows.filter(x=>x.inventoryStatus===st);
+    if(skip!=='vendor'&&v)rows=rows.filter(x=>x.vendor===v);
+    if(skip!=='model'&&m)rows=rows.filter(x=>x.model===m);
+    if(skip!=='markNo'&&mk)rows=rows.filter(x=>x.markNo===mk);
+    if(skip!=='warehouseLocation'&&loc)rows=rows.filter(x=>x.warehouseLocation===loc);
+    return rows;
+  }
+  function statusList(rows){let has=new Set(rows.map(x=>x.inventoryStatus).filter(Boolean));return ['In Stock','Used','Not Received'].filter(x=>has.has(x))}
+  function normalizeFilters(){
+    for(let i=0;i<6;i++){
+      let changed=false;
+      let statuses=statusList(applySelected(baseRows,'status'));if(st&&!statuses.includes(st)){st='';changed=true;}
+      let vendors=unique(applySelected(baseRows,'vendor'),'vendor');if(v&&!vendors.includes(v)){v='';changed=true;}
+      let models=unique(applySelected(baseRows,'model'),'model');if(m&&!models.includes(m)){m='';changed=true;}
+      let marks=unique(applySelected(baseRows,'markNo'),'markNo');if(mk&&!marks.includes(mk)){mk='';changed=true;}
+      let locations=unique(applySelected(baseRows,'warehouseLocation'),'warehouseLocation');if(loc&&!locations.includes(loc)){loc='';changed=true;}
+      if(!changed)break;
+    }
+  }
+  normalizeFilters();
+  let statusOptions=statusList(applySelected(baseRows,'status'));
+  let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
+  let modelOptions=unique(applySelected(baseRows,'model'),'model');
+  let markOptions=unique(applySelected(baseRows,'markNo'),'markNo');
+  let locationOptions=unique(applySelected(baseRows,'warehouseLocation'),'warehouseLocation');
+  let rows=filter(applySelected(baseRows,null),q);
   let totalRows=rows.length;
   let totalPages=Math.max(1,Math.ceil(totalRows/AppState.koikePageSize));
   if(AppState.koikePage>totalPages)AppState.koikePage=1;
   let start=(AppState.koikePage-1)*AppState.koikePageSize;
   let pageRows=rows.slice(start,start+AppState.koikePageSize);
   let emptyHint=baseRows.length?'' : '<div class="notice bad"><b>No KOIKE detail rows parsed.</b><br>Please upload the KOIKE detail file that contains CASE NO and Receive/Send date columns.</div>';
-  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div>${emptyHint}<div class="toolbar"><select id="kst" onchange="AppState.koikePage=1;renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><select id="kven" onchange="AppState.koikePage=1;renderKoike()">${opt(vendorOptions,v,'All vendors')}</select><select id="kmodel" onchange="AppState.koikePage=1;renderKoike()">${opt(modelOptions,m,'All models')}</select><select id="kmark" onchange="AppState.koikePage=1;renderKoike()">${opt(markOptions,mk,'All mark no')}</select><select id="kloc" onchange="AppState.koikePage=1;renderKoike()">${opt(locationOptions,loc,'All warehouse')}</select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="AppState.koikePage=1;renderKoike()"><button class="btn secondary" onclick="resetKoikeView()">Reset View</button><button class="btn secondary" onclick="csvRows('koike-inventory.csv',getKoikeFiltered())">Export KOIKE CSV</button></div>${t(pageRows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Amount'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],10000,'koike')}<div class='toolbar'><button class='btn secondary' onclick='goKoikeFirst()'>First</button><button class='btn secondary' onclick='goKoikePage(-1)'>Previous</button><span>Page ${AppState.koikePage} of ${totalPages}</span><button class='btn secondary' onclick='goKoikePage(1)'>Next</button><button class='btn secondary' onclick='goKoikeLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 1,000 rows.</p></div>`
+  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div>${emptyHint}<div class="toolbar"><select id="kst" onchange="AppState.koikePage=1;renderKoike()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><select id="kven" onchange="AppState.koikePage=1;renderKoike()">${opt(vendorOptions,v,'All vendors')}</select><select id="kmodel" onchange="AppState.koikePage=1;renderKoike()">${opt(modelOptions,m,'All models')}</select><select id="kmark" onchange="AppState.koikePage=1;renderKoike()">${opt(markOptions,mk,'All mark no')}</select><select id="kloc" onchange="AppState.koikePage=1;renderKoike()">${opt(locationOptions,loc,'All warehouse')}</select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="AppState.koikePage=1;renderKoike()"><button class="btn secondary" onclick="resetKoikeView()">Reset View</button><button class="btn secondary" onclick="csvRows('koike-inventory.csv',getKoikeFiltered())">Export KOIKE CSV</button></div>${t(pageRows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Amount'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],10000,'koike')}<div class='toolbar'><button class='btn secondary' onclick='goKoikeFirst()'>First</button><button class='btn secondary' onclick='goKoikePage(-1)'>Previous</button><span>Page ${AppState.koikePage} of ${totalPages}</span><button class='btn secondary' onclick='goKoikePage(1)'>Next</button><button class='btn secondary' onclick='goKoikeLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 1,000 rows.</p></div>`
 }
 function getKoikeFiltered(){
   let q=document.getElementById('kq')?.value||'',
