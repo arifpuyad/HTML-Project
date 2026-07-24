@@ -392,9 +392,9 @@ if(type==='koike'){
   // New KOIKE compatibility: if a CASE NO structure is detected, map it into master (in-house) records.
   if(cCase>=0 || headerHit.score>=5){
     let cMark=idx(headCase,['marking no','mark no','marking']); if(cMark<0)cMark=1;
-    let cRec=idx(headCase,['rec date','date receive','receive']); if(cRec<0)cRec=3;
+    let cRec=idx(headCase,['rec date','date receive','receive']);
     let cRob=idx(headCase,['rob','full']); if(cRob<0)cRob=4;
-    let cUse=idx(headCase,['send to hlym','to hlym','to f3','date back to f3']); if(cUse<0)cUse=5;
+    let cUse=idx(headCase,['send to hlym','to hlym','to f3','date back to f3']);
     let cLot=idx(headCase,['lot no','lot number','lot']);
     let cSeq=idx(headCase,['seq','remarks']); if(cSeq<0)cSeq=6;
     let cLoc=idx(headCase,['warehouse location','warehouse','wh location','location','wh']); if(cLoc<0)cLoc=0;
@@ -415,11 +415,14 @@ if(type==='koike'){
     }
     sheetModel=sheetModel||sheet;
     function caseNormKoike(x){let s=clean(x).replace(/^'/,'').replace(/\s+/g,'');if(/^\d+$/.test(s))s=s.padStart(6,'0');return s}
-    function isCaseNoKoike(x){
+    function isCaseLikeKoike(x){
       let s=caseNormKoike(x);
       if(!s)return false;
       if(headerLikeKoike(s))return false;
-      return /^\d{6}$/.test(s);
+      if(/^\d{6}$/.test(s))return true;
+      if(/^\d{1,4}-\d{1,4}$/.test(s))return true;
+      if(/^[A-Z0-9]{5,14}$/i.test(s)&&/\d/.test(s))return true;
+      return false;
     }
     function isDateLikeKoike(x){
       let s=clean(x);
@@ -504,20 +507,46 @@ if(type==='koike'){
       }
       return{col:best,score:bestScore};
     }
-    let caseScore=scanColumnScore(hCase+1,cCase,function(v){return isCaseNoKoike(v)});
+    let protectedCols=[cMark,cVendor,cModel,cFactory,cSetCode,cColour,cLoc].filter(function(x){return x>=0});
+    let caseScore=scanColumnScore(hCase+1,cCase,function(v){return isCaseLikeKoike(v)});
     if(cCase<0||caseScore===0){
-      let foundCase=findBestColumn(hCase+1,function(v){return isCaseNoKoike(v)},[]);
+      let foundCase=findBestColumn(hCase+1,function(v){return isCaseLikeKoike(v)},protectedCols);
       if(foundCase.score>0)cCase=foundCase.col;
     }
+    if(cRec<0)cRec=3;
+    if(cUse<0)cUse=5;
     let recScore=scanColumnScore(hCase+1,cRec,function(v){return !!parseInventoryDate(v)});
     let useScore=scanColumnScore(hCase+1,cUse,function(v){return !!parseInventoryDate(v)});
     if(cRec<0||recScore===0){
-      let foundRec=findBestColumn(hCase+1,function(v){return !!parseInventoryDate(v)},[cCase]);
+      let foundRec=findBestColumn(hCase+1,function(v){return !!parseInventoryDate(v)},protectedCols.concat([cCase]));
       if(foundRec.score>0)cRec=foundRec.col;
     }
     if(cUse<0||useScore===0||cUse===cRec){
-      let foundUse=findBestColumn(hCase+1,function(v){return !!parseInventoryDate(v)},[cCase,cRec]);
+      let foundUse=findBestColumn(hCase+1,function(v){return !!parseInventoryDate(v)},protectedCols.concat([cCase,cRec]));
       if(foundUse.score>0)cUse=foundUse.col;
+    }
+    // Smart date role assignment: receive is typically the denser date column, send is the sparser one.
+    let dateColA={col:cRec,score:scanColumnScore(hCase+1,cRec,function(v){return !!parseInventoryDate(v)})};
+    let dateColB={col:cUse,score:scanColumnScore(hCase+1,cUse,function(v){return !!parseInventoryDate(v)})};
+    if(dateColB.score>dateColA.score){let t=cRec;cRec=cUse;cUse=t;}
+    let lotScore=scanColumnScore(hCase+1,cLot,function(v){
+      let s=clean(v);
+      if(!s||headerLikeKoike(s))return false;
+      if(parseInventoryDate(s))return false;
+      if(/^\d{3}$/.test(s))return true;
+      if(/^[A-Z0-9]{2,6}$/i.test(s)&&!(/^[A-Z]{1,2}\d{1,2}$/i.test(s)))return true;
+      return false;
+    });
+    if(cLot<0||lotScore===0){
+      let foundLot=findBestColumn(hCase+1,function(v){
+        let s=clean(v);
+        if(!s||headerLikeKoike(s))return false;
+        if(parseInventoryDate(s))return false;
+        if(/^\d{3}$/.test(s))return true;
+        if(/^[A-Z0-9]{2,6}$/i.test(s)&&!(/^[A-Z]{1,2}\d{1,2}$/i.test(s)))return true;
+        return false;
+      },protectedCols.concat([cCase,cRec,cUse]));
+      if(foundLot.score>0)cLot=foundLot.col;
     }
     let caseRows=[];
     let ctx={warehouseLocation:'',vendor:'',model:'',factory:'',setCode:'',colourCode:'',markNo:''};
@@ -551,8 +580,8 @@ if(type==='koike'){
       let recIsDate=parseInventoryDate(recRaw)?true:false;
       let useIsDate=parseInventoryDate(useRaw)?true:false;
       let rowHasSignal=(markData||modelData||setData||colourData||vendorData||factoryData||recIsDate||useIsDate)&&!headerLikeKoike(recRaw)&&!headerLikeKoike(useRaw);
-      if(isCaseNoKoike(caseNo) || rowHasSignal){
-        if(!isCaseNoKoike(caseNo))caseNo='';
+      if(isCaseLikeKoike(caseNo) || rowHasSignal){
+        if(!isCaseLikeKoike(caseNo))caseNo='';
         caseRows.push({
           i,r,caseNo,
           rawCaseText:rawCaseText,
