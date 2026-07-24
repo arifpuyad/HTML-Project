@@ -507,6 +507,29 @@ if(type==='koike'){
       }
       return{col:best,score:bestScore};
     }
+    function pickRowCase(row,excludedValues){
+      let best='';
+      let cols=(row||[]).length;
+      for(let ci=0;ci<cols;ci++){
+        let raw=clean(row[ci]);
+        if(!raw||headerLikeKoike(raw))continue;
+        if(excludedValues.has(raw.toUpperCase()))continue;
+        let s=caseNormKoike(raw);
+        if(/^\d{6}$/.test(s))return s; // strongest
+        if(!best&&/^\d{1,4}-\d{1,4}$/.test(s))best=s;
+      }
+      return best;
+    }
+    function pickRowDates(row){
+      let out=[];
+      let cols=(row||[]).length;
+      for(let ci=0;ci<cols;ci++){
+        let raw=clean(row[ci]);
+        if(!raw||headerLikeKoike(raw))continue;
+        if(parseInventoryDate(raw))out.push(raw);
+      }
+      return out;
+    }
     let protectedCols=[cMark,cVendor,cModel,cFactory,cSetCode,cColour,cLoc].filter(function(x){return x>=0});
     let caseScore=scanColumnScore(hCase+1,cCase,function(v){return isCaseLikeKoike(v)});
     if(cCase<0||caseScore===0){
@@ -573,6 +596,8 @@ if(type==='koike'){
       if(colourData)ctx.colourCode=colourData;
       if(markData)ctx.markNo=markData;
       let caseNo=caseNormKoike(r[cCase]);
+      let excludedSet=new Set([vendorData,modelData,factoryData,setData,colourData,markData,ctx.vendor,ctx.model,ctx.factory,ctx.setCode,ctx.colourCode,ctx.markNo].filter(Boolean).map(function(v){return String(v).toUpperCase()}));
+      if(!isCaseLikeKoike(caseNo))caseNo=pickRowCase(r,excludedSet);
       let rawCaseText=columnValue(r,cCase);
       let lotText=columnValue(r,cLot);
       let recRaw=clean(r[cRec]);
@@ -601,7 +626,7 @@ if(type==='koike'){
       let item=caseRows[ci],i=item.i,r=item.r,caseNo=item.caseNo;
       let lotPart=/^\d{6}$/.test(caseNo)?caseNo.slice(0,3):clean(item.lotText);
       let seqPart=/^\d{6}$/.test(caseNo)?caseNo.slice(3):'';
-      let caseDisplay=/^\d{6}$/.test(caseNo)?caseNo:item.rawCaseText;
+      let caseDisplay=/^\d{6}$/.test(caseNo)?caseNo:(item.rawCaseText||caseNo);
       let mark=item.mark;
       let markNote='';
       if(mark){
@@ -621,6 +646,11 @@ if(type==='koike'){
       }
       if(!blockNo){blockNo=1;blockStartRow=i+1;}
       let drRaw=dval(r[cRec]),duRaw=dval(r[cUse]);
+      if(!parseInventoryDate(drRaw)||!parseInventoryDate(duRaw)){
+        let rowDates=pickRowDates(r);
+        if((!parseInventoryDate(drRaw))&&rowDates.length>0)drRaw=rowDates[0];
+        if((!parseInventoryDate(duRaw))&&rowDates.length>1)duRaw=rowDates[rowDates.length-1];
+      }
       let dr=parseInventoryDate(drRaw)?drRaw:'';
       let du=parseInventoryDate(duRaw)?duRaw:'';
       let st=du?'Used':(dr?'In Stock':'Not Received');
