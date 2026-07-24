@@ -146,8 +146,8 @@ nav button:before{content:"";position:absolute;left:0;top:0;height:100%;width:4p
 <div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
 <div id="loadingOverlay"><div class="loader-card"><div class="loader-title">Processing Inventory Data</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
 <header><div class="top"><div class="brand-lockup"><img src="yamaha-title-logo.jpg" class="brand-logo-img" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
-<div class="layout"><nav id="nav"><button data-v="upload" class="active" onclick="show('upload')">Upload & Generate</button><button data-v="inhouse" onclick="show('inhouse')">In-House Inventory</button><button data-v="external" onclick="show('external')">External Warehouse</button><button data-v="settings" onclick="show('settings')">Export & Settings</button></nav>
-<main class="content"><section id="upload" class="view"></section><section id="inhouse" class="view" hidden></section><section id="external" class="view" hidden></section><section id="settings" class="view" hidden></section><section id="dash" class="view" hidden></section><footer>Design and Code by Muhammad Arif</footer></main></div>
+<div class="layout"><nav id="nav"><button data-v="upload" class="active" onclick="show('upload')">Upload & Generate</button><button data-v="inhouse" onclick="show('inhouse')">In-House Inventory</button><button data-v="koike" onclick="show('koike')">KOIKE Inventory</button><button data-v="toll" onclick="show('toll')">Toll Global Inventory</button><button data-v="settings" onclick="show('settings')">Export & Settings</button></nav>
+<main class="content"><section id="upload" class="view"></section><section id="inhouse" class="view" hidden></section><section id="koike" class="view" hidden></section><section id="toll" class="view" hidden></section><section id="settings" class="view" hidden></section><section id="dash" class="view" hidden></section><footer>Design and Code by Muhammad Arif</footer></main></div>
 <script>
 // ==================== APPLICATION STATE ====================
 const AppState={files:{toll:[],koike:[],line:[],line123:[]},db:null,sort:{},showAll:false,inhousePage:1,inhousePageSize:5000};
@@ -724,15 +724,41 @@ function getInhouseFiltered(){
 }
 function orderBlockRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.sourceSheet,x.orderNo,x.blockNo,x.blockStartRow].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,modelName:x.modelName,colourCode:x.colourCode,blockNo:x.blockNo,blockStartRow:x.blockStartRow,lotNo:x.blockLotNo,caseFrom:x.blockCaseFrom,caseTo:x.blockCaseTo,total:0,received:0,used:0,stock:0,notReceived:0,pullInDate:x.blockPullInDate,remarks:x.remarks};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
 function lotRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.modelFull,x.endCode,x.orderNo,x.colourCode,x.lotNo].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,colourCode:x.colourCode,lotNo:x.lotNo,total:0,received:0,used:0,stock:0,notReceived:0};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
-function renderExternal(){
-  let el=document.getElementById('external');
-  if(!hasData()){el.innerHTML=noData('External warehouse empty until generated');return}
-  let q=el.querySelector('#eq')?.value||'';
-  let allRows=filter(AppState.db.containers,q);
-  let tollRows=allRows.filter(x=>x.warehouse==='Toll Global');
-  let koikeRows=allRows.filter(x=>x.warehouse==='Koike');
-  let otherRows=allRows.filter(x=>x.warehouse!=='Toll Global'&&x.warehouse!=='Koike');
-  el.innerHTML=`<div class="panel"><h2>External Warehouse</h2><div class="toolbar"><input id="eq" placeholder="Search container, model..." value="${esc(q)}" oninput="renderExternal()"><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export All External CSV</button></div><div class="notice">TOLL and KOIKE are shown in dedicated tables to keep each format compatible with its own columns.</div><h3>TOLL Global</h3><div class="toolbar"><button class="btn secondary" onclick="csvRows('toll-containers.csv',AppState.db.containers.filter(x=>x.warehouse==='Toll Global'))">Export TOLL CSV</button></div>${t(tollRows,[{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'dateArrive',l:'Arrive'},{k:'dateReceive',l:'Receive'},{k:'origin',l:'Origin'},{k:'m3',l:'M3'},{k:'boxQty',l:'Boxes'},{k:'sourceSheet',l:'Sheet'}],1000,'external-toll')}<h3 style="margin-top:22px">KOIKE</h3><div class="toolbar"><button class="btn secondary" onclick="csvRows('koike-containers.csv',AppState.db.containers.filter(x=>x.warehouse==='Koike'))">Export KOIKE CSV</button></div>${t(koikeRows,[{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'cdaNo',l:'CDA No'},{k:'pullInTime',l:'Pull In Time'},{k:'dateArrive',l:'Pull In Date'},{k:'dateReceive',l:'Unstuffing'},{k:'pullOutDate',l:'Pull Out'},{k:'sizeType',l:'Size'},{k:'model',l:'Model'},{k:'palletQty',l:'Pallets'},{k:'m3',l:'M3'},{k:'caseMark',l:'Case Mark'},{k:'country',l:'Country'},{k:'sourceSheet',l:'Sheet'}],1000,'external-koike')}${otherRows.length?`<h3 style="margin-top:22px">Other External Sources</h3>${t(otherRows,[{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'dateArrive',l:'Arrive'},{k:'dateReceive',l:'Receive'},{k:'sourceSheet',l:'Sheet'}],1000,'external-other')}`:''}</div>`
+function koikeStatus(row){return clean(row.pullOutDate)?'Used':'In Stock'}
+function tollStatusMap(){
+  let map={};
+  AppState.db.movements.forEach(function(m){
+    let key=clean(m.containerNo).toUpperCase();
+    if(!key)return;
+    let used=String(m.status||'').toLowerCase()==='closed'||num(m.balance)<=0;
+    if(!map[key]||used)map[key]=used?'Used':'In Stock';
+  });
+  return map;
+}
+function tollStatus(row,statusMap){
+  let key=clean(row.containerNo).toUpperCase();
+  return statusMap[key]||'In Stock';
+}
+function renderKoike(){
+  let el=document.getElementById('koike');
+  if(!hasData()){el.innerHTML=noData('KOIKE inventory empty until generated');return}
+  let q=el.querySelector('#kq')?.value||'';
+  let st=el.querySelector('#kst')?.value||'';
+  let rows=AppState.db.containers.filter(x=>x.warehouse==='Koike').map(function(x){return Object.assign({},x,{inventoryStatus:koikeStatus(x)})});
+  if(st)rows=rows.filter(x=>x.inventoryStatus===st);
+  rows=filter(rows,q);
+  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status is based on Pull Out date. Empty Pull Out = In Stock, filled Pull Out = Used.</div><div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option></select><input id="kq" placeholder="Search container, model, case mark..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-containers.csv',AppState.db.containers.filter(x=>x.warehouse==='Koike').map(x=>Object.assign({},x,{inventoryStatus:koikeStatus(x)})))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'containerNo',l:'Container'},{k:'cdaNo',l:'CDA No'},{k:'pullInTime',l:'Pull In Time'},{k:'dateArrive',l:'Pull In Date'},{k:'dateReceive',l:'Unstuffing'},{k:'pullOutDate',l:'Pull Out'},{k:'sizeType',l:'Size'},{k:'model',l:'Model'},{k:'palletQty',l:'Pallets'},{k:'m3',l:'M3'},{k:'caseMark',l:'Case Mark'},{k:'country',l:'Country'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
+}
+function renderToll(){
+  let el=document.getElementById('toll');
+  if(!hasData()){el.innerHTML=noData('Toll Global inventory empty until generated');return}
+  let q=el.querySelector('#tq')?.value||'';
+  let st=el.querySelector('#tst')?.value||'';
+  let statusMap=tollStatusMap();
+  let rows=AppState.db.containers.filter(x=>x.warehouse==='Toll Global').map(function(x){return Object.assign({},x,{inventoryStatus:tollStatus(x,statusMap)})});
+  if(st)rows=rows.filter(x=>x.inventoryStatus===st);
+  rows=filter(rows,q);
+  el.innerHTML=`<div class="panel"><h2>Toll Global Inventory</h2><div class="notice">Toll status uses movement ledger balance/closure: Open or positive balance = In Stock, Closed/zero balance = Used.</div><div class="toolbar"><select id="tst" onchange="renderToll()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option></select><input id="tq" placeholder="Search container, model, origin..." value="${esc(q)}" oninput="renderToll()"><button class="btn secondary" onclick="csvRows('toll-containers.csv',AppState.db.containers.filter(x=>x.warehouse==='Toll Global').map(x=>Object.assign({},x,{inventoryStatus:tollStatus(x,tollStatusMap())})))">Export TOLL CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'containerNo',l:'Container'},{k:'dateArrive',l:'Arrive'},{k:'dateReceive',l:'Receive'},{k:'origin',l:'Origin'},{k:'m3',l:'M3'},{k:'boxQty',l:'Boxes'},{k:'sourceSheet',l:'Sheet'}],1000,'toll')}</div>`
 }
 function renderLedger(){let el=document.getElementById('ledger');if(!hasData()){el.innerHTML=noData('Movement ledger empty until generated');return}let q=el.querySelector('#mq')?.value||'';let rows=filter(AppState.db.movements,q);el.innerHTML=`<div class="panel"><h2>Movement Ledger</h2><div class="toolbar"><input id="mq" placeholder="Search invoice, model, container..." value="${esc(q)}" oninput="renderLedger()"><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export CSV</button></div>${t(rows,[{k:'date',l:'Date'},{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'invoiceNo',l:'Invoice'},{k:'caseMarkOrderNo',l:'Order/Case Mark'},{k:'model',l:'Model'},{k:'caseIn',l:'Case In'},{k:'caseOut',l:'Case Out'},{k:'balance',l:'Balance'},{k:'location',l:'Location'}],1000,'ledger')}</div>`}
 function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',AppState.db.lineCases)">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data (Strict Rule)</button></div><p class="hint">Strict safety rule is active. Regenerate and Clear require exact confirmation text and automatic backup.</p></div>`}
@@ -745,7 +771,7 @@ function clearAll(){
   if(!createSafetyBackup('clear-all'))return;
   AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;renderAll();hideLoader();show('upload')
 }
-function renderAll(){renderUpload();renderInhouse();renderExternal();renderSettings()}
+function renderAll(){renderUpload();renderInhouse();renderKoike();renderToll();renderSettings()}
 renderAll();hideLoader();
 </script>
 </body></html>
