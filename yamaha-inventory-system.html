@@ -358,20 +358,21 @@ function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[]
 if(type==='koike'){
   let hCase=findHeader(rows,['case no']);
   let headCase=(rows[hCase]||[]).map(norm);
-  let cCase=idx(headCase,['case no','case number','case no.','case']);
+  let cCase=idx(headCase,['case no','case number','case no.','case #']);
   if(cCase<0){
     for(let hi=0;hi<Math.min(rows.length,50);hi++){
       let hrow=(rows[hi]||[]).map(norm);
       let score=0;
+      let hasCase=idx(hrow,['case no','case number','case no.','case #'])>=0;
       if(idx(hrow,['warehouse','location'])>=0)score++;
       if(idx(hrow,['marking no','mark no','marking'])>=0)score++;
       if(idx(hrow,['model','part model'])>=0)score++;
       if(idx(hrow,['factory','plant','country'])>=0)score++;
       if(idx(hrow,['set code','setcode','set'])>=0)score++;
       if(idx(hrow,['colour code','color code','colour','color'])>=0)score++;
-      if(idx(hrow,['case no','case number','case'])>=0)score++;
+      if(hasCase)score++;
       if(idx(hrow,['receive','rec date','date receive'])>=0)score++;
-      if(score>=3){hCase=hi;headCase=(rows[hCase]||[]).map(norm);cCase=idx(headCase,['case no','case number','case no.','case']);break}
+      if(hasCase&&score>=3){hCase=hi;headCase=(rows[hCase]||[]).map(norm);cCase=idx(headCase,['case no','case number','case no.','case #']);break}
     }
   }
   // New KOIKE compatibility: if a CASE NO structure is detected, map it into master (in-house) records.
@@ -403,8 +404,7 @@ if(type==='koike'){
       let s=caseNormKoike(x);
       if(!s)return false;
       if(headerLikeKoike(s))return false;
-      if(/^\d{6}$/.test(s))return true;
-      return /^[A-Z0-9\-]{4,14}$/i.test(s);
+      return /^\d{6}$/.test(s);
     }
     function isDateLikeKoike(x){
       let s=clean(x);
@@ -484,8 +484,6 @@ if(type==='koike'){
       let setData=(!headerLikeKoike(setNow))?setNow:'';
       let colourData=(!headerLikeKoike(colourNow))?colourNow:'';
       let markData=(!headerLikeKoike(markNow))?markNow:'';
-      let recData=clean(r[cRec]); if(headerLikeKoike(recData))recData='';
-      let useData=clean(r[cUse]); if(headerLikeKoike(useData))useData='';
       if(locNow)ctx.warehouseLocation=locNow;
       if(vendorData)ctx.vendor=vendorData;
       if(modelData)ctx.model=modelData;
@@ -494,9 +492,7 @@ if(type==='koike'){
       if(colourData)ctx.colourCode=colourData;
       if(markData)ctx.markNo=markData;
       let caseNo=caseNormKoike(r[cCase]);
-      let hasDetail=(markData||ctx.markNo||modelData||ctx.model||setData||ctx.setCode||colourData||ctx.colourCode||vendorData||ctx.vendor||recData||useData);
-      if(isCaseNoKoike(caseNo) || hasDetail){
-        if(!isCaseNoKoike(caseNo))caseNo='ROW'+String(i+1).padStart(4,'0');
+      if(isCaseNoKoike(caseNo)){
         caseRows.push({
           i,r,caseNo,
           mark:normalizeMarkKoike(markData||ctx.markNo),
@@ -532,7 +528,9 @@ if(type==='koike'){
         if(currentMark&&currentMark!==lastBlockOrder){blockNo++;blockStartRow=i+1;lastBlockOrder=currentMark;}
       }
       if(!blockNo){blockNo=1;blockStartRow=i+1;}
-      let dr=dval(r[cRec]),du=dval(r[cUse]);
+      let drRaw=dval(r[cRec]),duRaw=dval(r[cUse]);
+      let dr=parseInventoryDate(drRaw)?drRaw:'';
+      let du=parseInventoryDate(duRaw)?duRaw:'';
       let st=du?'Used':(dr?'In Stock':'Not Received');
       let seq=clean(r[cSeq]);
       let remarks=[headCase[cSeq]&&headCase[cSeq].includes('remark')?seq:'',markNote].filter(Boolean).join(' | ');
