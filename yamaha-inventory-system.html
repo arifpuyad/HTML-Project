@@ -295,6 +295,15 @@ function parseInventoryDate(v){
   v=clean(v);
   if(!v)return null;
   try{
+    // Excel serial date (e.g. 45567)
+    if(/^\d{5}(?:\.\d+)?$/.test(v)){
+      let serial=Number(v);
+      if(!isNaN(serial)){
+        let excelEpoch=new Date(Date.UTC(1899,11,30));
+        let d=new Date(excelEpoch.getTime()+Math.floor(serial)*86400000);
+        return isNaN(d)?null:d;
+      }
+    }
     let m=v.match(/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})$/);
     if(m){
       let d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
@@ -386,6 +395,7 @@ if(type==='koike'){
     let cRec=idx(headCase,['rec date','date receive','receive']); if(cRec<0)cRec=3;
     let cRob=idx(headCase,['rob','full']); if(cRob<0)cRob=4;
     let cUse=idx(headCase,['send to hlym','to hlym','to f3','date back to f3']); if(cUse<0)cUse=5;
+    let cLot=idx(headCase,['lot no','lot number','lot']);
     let cSeq=idx(headCase,['seq','remarks']); if(cSeq<0)cSeq=6;
     let cLoc=idx(headCase,['warehouse location','warehouse','wh location','location','wh']); if(cLoc<0)cLoc=0;
     let cVendor=idx(headCase,['vendor','maker','supplier']);
@@ -463,7 +473,7 @@ if(type==='koike'){
     }
     function headerLikeKoike(x){
       let n=norm(x);
-      return n==='warehouse'||n==='warehouse location'||n==='location'||n==='vendor'||n==='mark no'||n==='marking no'||n==='model'||n==='factory'||n==='set code'||n==='colour code'||n==='color code'||n==='case no'||n==='receive'||n==='send to hlym';
+      return n==='warehouse'||n==='warehouse location'||n==='location'||n==='vendor'||n==='mark no'||n==='marking no'||n==='model'||n==='factory'||n==='set code'||n==='colour code'||n==='color code'||n==='case no'||n==='case number'||n==='receive'||n==='send to hlym'||n==='lot'||n==='lot no'||n==='lot number';
     }
     function cleanWarehouseKoike(x){
       let s=clean(x);
@@ -471,6 +481,43 @@ if(type==='koike'){
       if(headerLikeKoike(s))return '';
       s=s.replace(/^warehouse\s*/i,'').trim();
       return s.toUpperCase();
+    }
+    function columnValue(row,col){return clean((row||[])[col]);}
+    function scanColumnScore(startRow,col,pred){
+      if(col<0)return 0;
+      let score=0,end=Math.min(rows.length,startRow+400);
+      for(let si=startRow;si<end;si++){
+        let v=columnValue(rows[si],col);
+        if(pred(v))score++;
+      }
+      return score;
+    }
+    function findBestColumn(startRow,pred,exclude){
+      exclude=exclude||[];
+      let maxCols=0;
+      for(let mi=startRow;mi<Math.min(rows.length,startRow+10);mi++)maxCols=Math.max(maxCols,(rows[mi]||[]).length);
+      let best=-1,bestScore=0;
+      for(let col=0;col<maxCols;col++){
+        if(exclude.includes(col))continue;
+        let s=scanColumnScore(startRow,col,pred);
+        if(s>bestScore){bestScore=s;best=col;}
+      }
+      return{col:best,score:bestScore};
+    }
+    let caseScore=scanColumnScore(hCase+1,cCase,function(v){return isCaseNoKoike(v)});
+    if(cCase<0||caseScore===0){
+      let foundCase=findBestColumn(hCase+1,function(v){return isCaseNoKoike(v)},[]);
+      if(foundCase.score>0)cCase=foundCase.col;
+    }
+    let recScore=scanColumnScore(hCase+1,cRec,function(v){return !!parseInventoryDate(v)});
+    let useScore=scanColumnScore(hCase+1,cUse,function(v){return !!parseInventoryDate(v)});
+    if(cRec<0||recScore===0){
+      let foundRec=findBestColumn(hCase+1,function(v){return !!parseInventoryDate(v)},[cCase]);
+      if(foundRec.score>0)cRec=foundRec.col;
+    }
+    if(cUse<0||useScore===0||cUse===cRec){
+      let foundUse=findBestColumn(hCase+1,function(v){return !!parseInventoryDate(v)},[cCase,cRec]);
+      if(foundUse.score>0)cUse=foundUse.col;
     }
     let caseRows=[];
     let ctx={warehouseLocation:'',vendor:'',model:'',factory:'',setCode:'',colourCode:'',markNo:''};
@@ -497,6 +544,8 @@ if(type==='koike'){
       if(colourData)ctx.colourCode=colourData;
       if(markData)ctx.markNo=markData;
       let caseNo=caseNormKoike(r[cCase]);
+      let rawCaseText=columnValue(r,cCase);
+      let lotText=columnValue(r,cLot);
       let recRaw=clean(r[cRec]);
       let useRaw=clean(r[cUse]);
       let recIsDate=parseInventoryDate(recRaw)?true:false;
@@ -506,6 +555,8 @@ if(type==='koike'){
         if(!isCaseNoKoike(caseNo))caseNo='';
         caseRows.push({
           i,r,caseNo,
+          rawCaseText:rawCaseText,
+          lotText:lotText,
           mark:normalizeMarkKoike(markData||ctx.markNo),
           warehouseLocation:locNow||ctx.warehouseLocation,
           vendor:vendorData||ctx.vendor,
@@ -519,8 +570,9 @@ if(type==='koike'){
     let currentMark='',currentColour='',blockNo=0,blockStartRow=0,lastBlockOrder='';
     for(let ci=0;ci<caseRows.length;ci++){
       let item=caseRows[ci],i=item.i,r=item.r,caseNo=item.caseNo;
-      let lotPart=/^\d{6}$/.test(caseNo)?caseNo.slice(0,3):'';
+      let lotPart=/^\d{6}$/.test(caseNo)?caseNo.slice(0,3):clean(item.lotText);
       let seqPart=/^\d{6}$/.test(caseNo)?caseNo.slice(3):'';
+      let caseDisplay=/^\d{6}$/.test(caseNo)?caseNo:item.rawCaseText;
       let mark=item.mark;
       let markNote='';
       if(mark){
@@ -545,7 +597,7 @@ if(type==='koike'){
       let st=du?'Used':(dr?'In Stock':'Not Received');
       let seq=clean(r[cSeq]);
       let remarks=[headCase[cSeq]&&headCase[cSeq].includes('remark')?seq:'',markNote].filter(Boolean).join(' | ');
-      o.lineCases.push({warehouse:'Koike',warehouseLocation:item.warehouseLocation||'',vendor:item.vendor||meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:item.setCode||sheet,modelFull:item.model||sheetModel,modelName:item.model||sheetModel,factory:item.factory||'',colourCode:item.colourCode||currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:lotPart,blockCaseFrom:seqPart,blockCaseTo:seqPart,blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:clean(r[cMark])||item.mark||currentMark,caseNo,lotNo:lotPart,caseSeq:seqPart,dateReceive:dr,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,sendToHlym:du,seq,status:st})
+      o.lineCases.push({warehouse:'Koike',warehouseLocation:item.warehouseLocation||'',vendor:item.vendor||meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:item.setCode||sheet,modelFull:item.model||sheetModel,modelName:item.model||sheetModel,factory:item.factory||'',colourCode:item.colourCode||currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:lotPart,blockCaseFrom:seqPart,blockCaseTo:seqPart,blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:clean(r[cMark])||item.mark||currentMark,caseNo:caseDisplay,lotNo:lotPart,caseSeq:seqPart,dateReceive:dr,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,sendToHlym:du,seq,status:st})
     }
   }else{
     let h=findHeader(rows,['Container Number']);
