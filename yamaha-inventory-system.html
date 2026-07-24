@@ -427,7 +427,16 @@ if(type==='koike'){
       if(sheetModel)break;
     }
     sheetModel=sheetModel||sheet;
-    function caseNormKoike(x){let s=clean(x).replace(/^'/,'').replace(/\s+/g,'');if(/^\d+$/.test(s))s=s.padStart(6,'0');return s}
+    function normalizeCaseTextKoike(x){
+      let s=clean(x).replace(/^'/,'').trim();
+      let m=s.match(/^(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[\s\-\/\.]+(\d{1,4})$/i);
+      if(m){
+        let mm={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12}[m[1].toLowerCase()];
+        if(mm)return `${mm}-${Number(m[2])}`;
+      }
+      return s;
+    }
+    function caseNormKoike(x){let s=normalizeCaseTextKoike(x).replace(/\s+/g,'');if(/^\d+$/.test(s))s=s.padStart(6,'0');return s}
     function isCaseLikeKoike(x){
       let s=caseNormKoike(x);
       if(!s)return false;
@@ -612,7 +621,7 @@ if(type==='koike'){
       let caseNo=caseNormKoike(r[cCase]);
       let excludedSet=new Set([vendorData,modelData,factoryData,setData,colourData,markData,ctx.vendor,ctx.model,ctx.factory,ctx.setCode,ctx.colourCode,ctx.markNo].filter(Boolean).map(function(v){return String(v).toUpperCase()}));
       if(!isCaseLikeKoike(caseNo) && !strictCaseColumn)caseNo=pickRowCase(r,excludedSet);
-      let rawCaseText=columnValue(r,cCase);
+      let rawCaseText=normalizeCaseTextKoike(columnValue(r,cCase));
       let lotText=columnValue(r,cLot);
       let recRaw=clean(r[cRec]);
       let useRaw=clean(r[cUse]);
