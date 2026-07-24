@@ -407,15 +407,31 @@ if(type==='line123'){
     let s=clean(x); if(!s)return true;
     let n=norm(s);
     if(isDateLikeLine123(s))return true;
+    // Starts with "/" → model spec reference e.g. "/ B1-010A"
+    if(s.startsWith('/'))return true;
     // Model spec codes: 010A, 010B, 010B-BNC2, 010D-VYRM3 (3 digits + letter prefix)
     if(/^\d{3}[A-Z]/i.test(s))return true;
-    // Lot/spec codes: A3-010A, A3 - 010C, C3-010A (letter+digit(s) dash 3digit+letter)
+    // Lot/spec codes with dash: A3-010A, A3 - 010C, C3-010A
     if(/^[A-Z]\d+\s*[-]\s*\d{3}[A-Z]/i.test(s))return true;
-    // Values starting with a digit are never valid Order Nos (e.g. 8BFUDX1P8, 8L:MDBNM4=8)
+    // Lot/spec codes with space: A7 010B, A8 010A, A8 010B ( MDNM8 )
+    if(/^[A-Z]\d+\s+\d{3}[A-Z]/i.test(s))return true;
+    // Values starting with a digit: 8BFUDX1P8, 8L:MDBNM4=8
     if(/^\d/.test(s))return true;
     // label:code=qty patterns: "8L : MDBNM4 = 8", "8 : MDBNM4 = 10"
     if(/^\w{1,4}\s*:\s*[A-Z0-9-]+\s*=\s*\d+/i.test(s))return true;
-    // Common non-order details: quantity, engine, colour code, source note. NCxxxxx is Order No; MDBxxxxx is Colour Code.
+    // Production/gear codes like PGD-10 (2-5 letters + dash + 1-4 digits, no letter suffix)
+    if(/^[A-Z]{2,5}-\d{1,4}$/i.test(s))return true;
+    // SEQ notes: "SEQ 307"
+    if(/^seq\b/i.test(s))return true;
+    // Rob/catalyst notes (all forms)
+    if(/^rob\b/i.test(s))return true;
+    // Tarik (Malay "pull") notes: "TARIK MASUK", "PLAN TARIK"
+    if(n.includes('tarik'))return true;
+    // Batch notes: "TAMADAM 1ST BATCH", "2ND BATCH"
+    if(n.includes('batch'))return true;
+    // Px dash/space code=qty: "P4 - MDNM6 = 8", "P4 MDNM6 = 8"
+    if(/^P\d+\s*[-\s]+[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
+    // Common non-order details: quantity, engine, colour code, source note.
     if(/^\d+(?:\.\d+)?\s*(unit|units|pcs|pc|set|sets|case|cases|box|boxes)\b/i.test(s))return true;
     if(/^(unit|units|pcs|pc|set|sets|case|cases|box|boxes)\b/i.test(s))return true;
     if(/^[a-z0-9]{1,8}\s*=\s*\d+/i.test(s))return true;
@@ -428,10 +444,8 @@ if(type==='line123'){
     if(/^P\d+\s+[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
     if(/^\*+\s*for\s+pdrm$/i.test(s))return true;
     if(/^\d+\s*:\s*[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
-    if(/^[A-Z]\d\s+\d{3}[A-Z]?$/i.test(s))return true;
     if(/^[A-Z]\d\s*\([^)]*\)\s*=\s*\d+$/i.test(s))return true;
-    if(n==='rob'||n==='rob catalyst'||n==='rm7')return true;
-    if(n.includes('plan tarik'))return true;
+    if(n==='rm7')return true;
     if(n==='taipanco yard'||n==='warehouse')return true;
     if(/^(MDB[A-Z0-9-]{3,}|DPBMC)$/i.test(s))return true;
     return false;
@@ -442,9 +456,11 @@ if(type==='line123'){
   }
   function isOrderNoLine123(x){
     let s=clean(x); if(!s)return false;
+    // Order Nos are always single-word tokens — no internal spaces
+    if(/\s/.test(s))return false;
     if(isDetailOrSubPartLine123(s))return false;
     let compact=s.replace(/[^A-Za-z0-9]/g,'');
-    if(compact.length<3)return false;
+    if(compact.length<4)return false;
     if(/^\d+$/.test(compact))return false;
     return true;
   }
