@@ -366,6 +366,12 @@ if(type==='koike'){
     let cRob=idx(headCase,['rob','full']); if(cRob<0)cRob=4;
     let cUse=idx(headCase,['to f3','date back to f3']); if(cUse<0)cUse=5;
     let cSeq=idx(headCase,['seq','remarks']); if(cSeq<0)cSeq=6;
+    let cLoc=idx(headCase,['warehouse location','wh location','location','container']); if(cLoc<0)cLoc=0;
+    let cVendor=idx(headCase,['vendor']);
+    let cModel=idx(headCase,['model']);
+    let cFactory=idx(headCase,['factory']);
+    let cSetCode=idx(headCase,['set code','setcode']);
+    let cColour=idx(headCase,['colour code','color code','colour','color']);
     let meta=vendorFromInstant(sourceFile,rows);
     if(meta.vendor==='UNKNOWN')meta={vendor:'KOIKE',line:'Line 1,2,3'};
     let sheetModel='';
@@ -460,7 +466,7 @@ if(type==='koike'){
       let st=du?'Used':(dr?'In Stock':'Not Received');
       let seq=clean(r[cSeq]);
       let remarks=[headCase[cSeq]&&headCase[cSeq].includes('remark')?seq:'',markNote].filter(Boolean).join(' | ');
-      o.lineCases.push({vendor:meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:sheet,modelFull:sheetModel,modelName:sheetModel,colourCode:currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:caseNo.slice(0,3),blockCaseFrom:caseNo.slice(3),blockCaseTo:caseNo.slice(3),blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:currentMark,caseNo,lotNo:caseNo.slice(0,3),caseSeq:caseNo.slice(3),dateReceive:dr,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,seq,status:st})
+      o.lineCases.push({warehouse:'Koike',warehouseLocation:clean(r[cLoc]),vendor:clean(cVendor>=0?r[cVendor]:'')||meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:clean(cSetCode>=0?r[cSetCode]:'')||sheet,modelFull:clean(cModel>=0?r[cModel]:'')||sheetModel,modelName:clean(cModel>=0?r[cModel]:'')||sheetModel,factory:clean(cFactory>=0?r[cFactory]:''),colourCode:clean(cColour>=0?r[cColour]:'')||currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:caseNo.slice(0,3),blockCaseFrom:caseNo.slice(3),blockCaseTo:caseNo.slice(3),blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:clean(r[cMark])||currentMark,caseNo,lotNo:caseNo.slice(0,3),caseSeq:caseNo.slice(3),dateReceive:dr,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,sendToHlym:du,seq,status:st})
     }
   }else{
     let h=findHeader(rows,['Container Number']);
@@ -725,6 +731,7 @@ function getInhouseFiltered(){
 function orderBlockRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.sourceSheet,x.orderNo,x.blockNo,x.blockStartRow].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,modelName:x.modelName,colourCode:x.colourCode,blockNo:x.blockNo,blockStartRow:x.blockStartRow,lotNo:x.blockLotNo,caseFrom:x.blockCaseFrom,caseTo:x.blockCaseTo,total:0,received:0,used:0,stock:0,notReceived:0,pullInDate:x.blockPullInDate,remarks:x.remarks};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
 function lotRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.modelFull,x.endCode,x.orderNo,x.colourCode,x.lotNo].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,colourCode:x.colourCode,lotNo:x.lotNo,total:0,received:0,used:0,stock:0,notReceived:0};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
 function koikeStatus(row){return clean(row.pullOutDate)?'Used':'In Stock'}
+function koikeCaseStatus(row){return clean(row.sendToHlym||row.dateUse)?'Used':(clean(row.dateReceive)?'In Stock':'Not Received')}
 function tollStatusMap(){
   let map={};
   AppState.db.movements.forEach(function(m){
@@ -739,15 +746,56 @@ function tollStatus(row,statusMap){
   let key=clean(row.containerNo).toUpperCase();
   return statusMap[key]||'In Stock';
 }
+function koikeViewRows(){
+  let detailRows=AppState.db.lineCases
+    .filter(function(x){return x.warehouse==='Koike';})
+    .map(function(x){
+      return{
+        inventoryStatus:koikeCaseStatus(x),
+        warehouseLocation:clean(x.warehouseLocation),
+        vendor:clean(x.vendor),
+        markNo:clean(x.markingNo),
+        model:clean(x.modelFull||x.modelName),
+        factory:clean(x.factory),
+        setCode:clean(x.endCode),
+        colourCode:clean(x.colourCode),
+        lotNumber:clean(x.lotNo),
+        caseNumber:clean(x.caseNo),
+        receiveInfo:clean(x.dateReceive),
+        sendToHlym:clean(x.sendToHlym||x.dateUse),
+        sourceSheet:clean(x.sourceSheet)
+      };
+    });
+  if(detailRows.length)return detailRows;
+  return AppState.db.containers
+    .filter(function(x){return x.warehouse==='Koike';})
+    .map(function(x){
+      return{
+        inventoryStatus:koikeStatus(x),
+        warehouseLocation:clean(x.containerNo),
+        vendor:'KOIKE',
+        markNo:clean(x.caseMark),
+        model:clean(x.model),
+        factory:clean(x.country),
+        setCode:clean(x.sizeType),
+        colourCode:'',
+        lotNumber:'',
+        caseNumber:'',
+        receiveInfo:clean(x.dateReceive),
+        sendToHlym:clean(x.pullOutDate),
+        sourceSheet:clean(x.sourceSheet)
+      };
+    });
+}
 function renderKoike(){
   let el=document.getElementById('koike');
   if(!hasData()){el.innerHTML=noData('KOIKE inventory empty until generated');return}
   let q=el.querySelector('#kq')?.value||'';
   let st=el.querySelector('#kst')?.value||'';
-  let rows=AppState.db.containers.filter(x=>x.warehouse==='Koike').map(function(x){return Object.assign({},x,{inventoryStatus:koikeStatus(x)})});
+  let rows=koikeViewRows();
   if(st)rows=rows.filter(x=>x.inventoryStatus===st);
   rows=filter(rows,q);
-  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status is based on Pull Out date. Empty Pull Out = In Stock, filled Pull Out = Used.</div><div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option></select><input id="kq" placeholder="Search container, model, case mark..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-containers.csv',AppState.db.containers.filter(x=>x.warehouse==='Koike').map(x=>Object.assign({},x,{inventoryStatus:koikeStatus(x)})))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'containerNo',l:'Container'},{k:'cdaNo',l:'CDA No'},{k:'pullInTime',l:'Pull In Time'},{k:'dateArrive',l:'Pull In Date'},{k:'dateReceive',l:'Unstuffing'},{k:'pullOutDate',l:'Pull Out'},{k:'sizeType',l:'Size'},{k:'model',l:'Model'},{k:'palletQty',l:'Pallets'},{k:'m3',l:'M3'},{k:'caseMark',l:'Case Mark'},{k:'country',l:'Country'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
+  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div><div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><input id="kq" placeholder="Search location, vendor, mark no, model..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-inventory.csv',filter((document.getElementById('kst')?.value?koikeViewRows().filter(x=>x.inventoryStatus===document.getElementById('kst')?.value):koikeViewRows()),document.getElementById('kq')?.value||''))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse Location'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Number'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
 }
 function renderToll(){
   let el=document.getElementById('toll');
