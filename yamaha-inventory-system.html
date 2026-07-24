@@ -458,7 +458,7 @@ if(type==='koike'){
       if(y)return y;
       let d=parseInventoryDate(v);
       if(!d)return '';
-      if(monthDayNoYearKoike(v))return contextYearKoike()||'';
+      if(monthDayNoYearKoike(v))return contextYearKoike()||String(d.getFullYear());
       return String(d.getFullYear());
     }
     function normalizeCaseTextKoike(x){
