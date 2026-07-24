@@ -361,17 +361,17 @@ if(type==='koike'){
   let cCase=idx(headCase,['case no']);
   // New KOIKE compatibility: if a CASE NO structure is detected, map it into master (in-house) records.
   if(cCase>=0){
-    let cMark=idx(headCase,['marking no']); if(cMark<0)cMark=1;
-    let cRec=idx(headCase,['rec date','date receive']); if(cRec<0)cRec=3;
+    let cMark=idx(headCase,['marking no','mark no','marking']); if(cMark<0)cMark=1;
+    let cRec=idx(headCase,['rec date','date receive','receive']); if(cRec<0)cRec=3;
     let cRob=idx(headCase,['rob','full']); if(cRob<0)cRob=4;
-    let cUse=idx(headCase,['to f3','date back to f3']); if(cUse<0)cUse=5;
+    let cUse=idx(headCase,['send to hlym','to hlym','to f3','date back to f3']); if(cUse<0)cUse=5;
     let cSeq=idx(headCase,['seq','remarks']); if(cSeq<0)cSeq=6;
-    let cLoc=idx(headCase,['warehouse location','wh location','location','container']); if(cLoc<0)cLoc=0;
-    let cVendor=idx(headCase,['vendor']);
-    let cModel=idx(headCase,['model']);
-    let cFactory=idx(headCase,['factory']);
-    let cSetCode=idx(headCase,['set code','setcode']);
-    let cColour=idx(headCase,['colour code','color code','colour','color']);
+    let cLoc=idx(headCase,['warehouse location','warehouse','wh location','location','wh']); if(cLoc<0)cLoc=0;
+    let cVendor=idx(headCase,['vendor','maker','supplier']);
+    let cModel=idx(headCase,['model','part model','model name']);
+    let cFactory=idx(headCase,['factory','plant','country']);
+    let cSetCode=idx(headCase,['set code','setcode','set','set no']);
+    let cColour=idx(headCase,['colour code','color code','colour','color','code warna']);
     let meta=vendorFromInstant(sourceFile,rows);
     if(meta.vendor==='UNKNOWN')meta={vendor:'KOIKE',line:'Line 1,2,3'};
     let sheetModel='';
@@ -435,11 +435,48 @@ if(type==='koike'){
       for(let k=pos+1;k<caseRows.length&&k<=pos+80;k++){let m=caseRows[k].mark;if(isOrderNoKoike(m))return m;}
       return '';
     }
+    function headerLikeKoike(x){
+      let n=norm(x);
+      return n==='warehouse'||n==='warehouse location'||n==='location'||n==='vendor'||n==='mark no'||n==='marking no'||n==='model'||n==='factory'||n==='set code'||n==='colour code'||n==='color code'||n==='case no'||n==='receive'||n==='send to hlym';
+    }
+    function cleanWarehouseKoike(x){
+      let s=clean(x);
+      if(!s)return '';
+      if(headerLikeKoike(s))return '';
+      s=s.replace(/^warehouse\s*/i,'').trim();
+      return s.toUpperCase();
+    }
     let caseRows=[];
+    let ctx={warehouseLocation:'',vendor:'',model:'',factory:'',setCode:'',colourCode:'',markNo:''};
     for(let i=hCase+1;i<rows.length;i++){
       let r=rows[i]||[];
+      let locNow=cleanWarehouseKoike(r[cLoc]);
+      let vendorNow=clean(r[cVendor]);
+      let modelNow=clean(r[cModel]);
+      let factoryNow=clean(r[cFactory]);
+      let setNow=clean(r[cSetCode]);
+      let colourNow=clean(r[cColour]);
+      let markNow=clean(r[cMark]);
+      if(locNow)ctx.warehouseLocation=locNow;
+      if(vendorNow&&!headerLikeKoike(vendorNow))ctx.vendor=vendorNow;
+      if(modelNow&&!headerLikeKoike(modelNow))ctx.model=modelNow;
+      if(factoryNow&&!headerLikeKoike(factoryNow))ctx.factory=factoryNow;
+      if(setNow&&!headerLikeKoike(setNow))ctx.setCode=setNow;
+      if(colourNow&&!headerLikeKoike(colourNow))ctx.colourCode=colourNow;
+      if(markNow&&!headerLikeKoike(markNow))ctx.markNo=markNow;
       let caseNo=caseNormKoike(r[cCase]);
-      if(isCaseNoKoike(caseNo))caseRows.push({i,r,caseNo,mark:normalizeMarkKoike(clean(r[cMark]))});
+      if(isCaseNoKoike(caseNo)){
+        caseRows.push({
+          i,r,caseNo,
+          mark:normalizeMarkKoike(markNow||ctx.markNo),
+          warehouseLocation:locNow||ctx.warehouseLocation,
+          vendor:vendorNow||ctx.vendor,
+          model:modelNow||ctx.model,
+          factory:factoryNow||ctx.factory,
+          setCode:setNow||ctx.setCode,
+          colourCode:colourNow||ctx.colourCode
+        });
+      }
     }
     let currentMark='',currentColour='',blockNo=0,blockStartRow=0,lastBlockOrder='';
     for(let ci=0;ci<caseRows.length;ci++){
@@ -466,7 +503,7 @@ if(type==='koike'){
       let st=du?'Used':(dr?'In Stock':'Not Received');
       let seq=clean(r[cSeq]);
       let remarks=[headCase[cSeq]&&headCase[cSeq].includes('remark')?seq:'',markNote].filter(Boolean).join(' | ');
-      o.lineCases.push({warehouse:'Koike',warehouseLocation:clean(r[cLoc]),vendor:clean(cVendor>=0?r[cVendor]:'')||meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:clean(cSetCode>=0?r[cSetCode]:'')||sheet,modelFull:clean(cModel>=0?r[cModel]:'')||sheetModel,modelName:clean(cModel>=0?r[cModel]:'')||sheetModel,factory:clean(cFactory>=0?r[cFactory]:''),colourCode:clean(cColour>=0?r[cColour]:'')||currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:caseNo.slice(0,3),blockCaseFrom:caseNo.slice(3),blockCaseTo:caseNo.slice(3),blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:clean(r[cMark])||currentMark,caseNo,lotNo:caseNo.slice(0,3),caseSeq:caseNo.slice(3),dateReceive:dr,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,sendToHlym:du,seq,status:st})
+      o.lineCases.push({warehouse:'Koike',warehouseLocation:item.warehouseLocation||'',vendor:item.vendor||meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:item.setCode||sheet,modelFull:item.model||sheetModel,modelName:item.model||sheetModel,factory:item.factory||'',colourCode:item.colourCode||currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:caseNo.slice(0,3),blockCaseFrom:caseNo.slice(3),blockCaseTo:caseNo.slice(3),blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:clean(r[cMark])||item.mark||currentMark,caseNo,lotNo:caseNo.slice(0,3),caseSeq:caseNo.slice(3),dateReceive:dr,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,sendToHlym:du,seq,status:st})
     }
   }else{
     let h=findHeader(rows,['Container Number']);
@@ -772,7 +809,7 @@ function koikeViewRows(){
     .map(function(x){
       return{
         inventoryStatus:koikeStatus(x),
-        warehouseLocation:clean(x.containerNo),
+        warehouseLocation:clean(x.containerNo).replace(/^warehouse\s*/i,'').toUpperCase(),
         vendor:'KOIKE',
         markNo:clean(x.caseMark),
         model:clean(x.model),
@@ -795,7 +832,7 @@ function renderKoike(){
   let rows=koikeViewRows();
   if(st)rows=rows.filter(x=>x.inventoryStatus===st);
   rows=filter(rows,q);
-  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div><div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><input id="kq" placeholder="Search location, vendor, mark no, model..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-inventory.csv',filter((document.getElementById('kst')?.value?koikeViewRows().filter(x=>x.inventoryStatus===document.getElementById('kst')?.value):koikeViewRows()),document.getElementById('kq')?.value||''))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse Location'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Number'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
+  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div><div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-inventory.csv',filter((document.getElementById('kst')?.value?koikeViewRows().filter(x=>x.inventoryStatus===document.getElementById('kst')?.value):koikeViewRows()),document.getElementById('kq')?.value||''))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Number'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
 }
 function renderToll(){
   let el=document.getElementById('toll');
