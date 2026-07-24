@@ -392,20 +392,37 @@ if(type==='line123'){
     if(/^(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})$/.test(s))return true;
     return false;
   }
+  // Strip model-spec codes from slash notation: "BEY430 / B1-010A" → "BEY430"
+  // Both parts like "BF3VY0 / BF3VY0P1" are preserved (first is used as Order No).
+  function normalizeMarkLine123(s){
+    s=clean(s);
+    if(!s.includes('/'))return s;
+    let parts=s.split('/').map(function(p){return p.trim()});
+    // Model spec pattern: single letter + digit(s) + dash/space + 3 digits + letter(s) e.g. B1-010A, B6-010B, A3-010C
+    let modelSpec=/^[A-Z]\d+[-\s]\d{3}[A-Z0-9]*$/i;
+    let valid=parts.filter(function(p){return p.length>0&&!modelSpec.test(p)});
+    return valid.length>0?valid[0]:parts[0]||s;
+  }
   function isDetailOrSubPartLine123(x){
     let s=clean(x); if(!s)return true;
     let n=norm(s);
     if(isDateLikeLine123(s))return true;
-    // Common non-order details found in Instant Warehouse Record: quantity, engine, colour code, source note. NCxxxxx is treated as Order No; MDBxxxxx is treated as Colour Code.
+    // Model spec codes: 010A, 010B, 010B-BNC2, 010D-VYRM3 (3 digits + letter prefix)
+    if(/^\d{3}[A-Z]/i.test(s))return true;
+    // Lot/spec codes: A3-010A, A3 - 010C, C3-010A (letter+digit(s) dash 3digit+letter)
+    if(/^[A-Z]\d+\s*[-]\s*\d{3}[A-Z]/i.test(s))return true;
+    // Values starting with a digit are never valid Order Nos (e.g. 8BFUDX1P8, 8L:MDBNM4=8)
+    if(/^\d/.test(s))return true;
+    // label:code=qty patterns: "8L : MDBNM4 = 8", "8 : MDBNM4 = 10"
+    if(/^\w{1,4}\s*:\s*[A-Z0-9-]+\s*=\s*\d+/i.test(s))return true;
+    // Common non-order details: quantity, engine, colour code, source note. NCxxxxx is Order No; MDBxxxxx is Colour Code.
     if(/^\d+(?:\.\d+)?\s*(unit|units|pcs|pc|set|sets|case|cases|box|boxes)\b/i.test(s))return true;
     if(/^(unit|units|pcs|pc|set|sets|case|cases|box|boxes)\b/i.test(s))return true;
     if(/^[a-z0-9]{1,8}\s*=\s*\d+/i.test(s))return true;
     if(n==='engine'||n.includes('engine '))return true;
     if(n.includes('receive')||n.includes('from koike')||n==='koike'||n.includes('hlym')||n.includes('pull'))return true;
     if(n.includes('full case')||n.includes('use for prod')||n.includes('rob sub')||n.includes('lot mati'))return true;
-    // User-confirmed non-order notes. Keep the previous valid Order No for the same data block.
     if(/^\(.+\)$/i.test(s))return true;
-    // Parentheses part notes can be followed by quantity or colour balance text, e.g. "( Fuel Tank ) P2 MDNM6 = 0".
     if(/\(\s*(fuel\s*tank|f\.?fender|f\.?tank)\s*\)/i.test(s))return true;
     if(/^\([^)]*\)\s*P\d+\s+[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
     if(/^P\d+\s+[A-Z0-9-]+\s*=\s*\d+$/i.test(s))return true;
@@ -416,13 +433,11 @@ if(type==='line123'){
     if(n==='rob'||n==='rob catalyst'||n==='rm7')return true;
     if(n.includes('plan tarik'))return true;
     if(n==='taipanco yard'||n==='warehouse')return true;
-    // MDB and DPBMC styles are colour codes, not order numbers. NC style remains Order No.
     if(/^(MDB[A-Z0-9-]{3,}|DPBMC)$/i.test(s))return true;
     return false;
   }
   function isColourCodeLine123(x){
     let s=clean(x); if(!s)return false;
-    // User-confirmed: MDBNM4-8 and DPBMC should be stored under Colour Code, not Order No.
     return /^(MDB[A-Z0-9-]{3,}|DPBMC)$/i.test(s);
   }
   function isOrderNoLine123(x){
@@ -443,7 +458,7 @@ if(type==='line123'){
   for(let i=h+1;i<rows.length;i++){
     let r=rows[i]||[];
     let caseNo=caseNorm123(r[cCase]);
-    if(isCaseNo123(caseNo))caseRows.push({i,r,caseNo,mark:clean(r[cMark])});
+    if(isCaseNo123(caseNo))caseRows.push({i,r,caseNo,mark:normalizeMarkLine123(clean(r[cMark]))});
   }
   let currentMark='', currentColour='', blockNo=0, blockStartRow=0, lastBlockOrder='';
   let totalCases=0;
