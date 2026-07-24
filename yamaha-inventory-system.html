@@ -361,7 +361,6 @@ if(type==='koike'){
     for(let hi=0;hi<limit;hi++){
       let hrow=(rows[hi]||[]).map(norm);
       let hasCase=idx(hrow,['case no','case number','case no.','case #'])>=0;
-      if(!hasCase)continue;
       let score=0;
       if(idx(hrow,['warehouse','location','wh'])>=0)score+=3;
       if(idx(hrow,['marking no','mark no','marking'])>=0)score+=2;
@@ -371,16 +370,18 @@ if(type==='koike'){
       if(idx(hrow,['colour code','color code','colour','color'])>=0)score+=1;
       if(idx(hrow,['receive','rec date','date receive'])>=0)score+=2;
       if(idx(hrow,['send to hlym','to hlym','to f3','date back to f3'])>=0)score+=2;
+      if(hasCase)score+=2;
       if(score>bestScore){bestScore=score;best=hi;}
     }
-    return best;
+    return {row:best,score:bestScore};
   }
-  let hCase=findKoikeHeaderRow(rows);
+  let headerHit=findKoikeHeaderRow(rows);
+  let hCase=headerHit.row;
   if(hCase<0)hCase=findHeader(rows,['case no']);
   let headCase=(rows[hCase]||[]).map(norm);
   let cCase=idx(headCase,['case no','case number','case no.','case #']);
   // New KOIKE compatibility: if a CASE NO structure is detected, map it into master (in-house) records.
-  if(cCase>=0){
+  if(cCase>=0 || headerHit.score>=5){
     let cMark=idx(headCase,['marking no','mark no','marking']); if(cMark<0)cMark=1;
     let cRec=idx(headCase,['rec date','date receive','receive']); if(cRec<0)cRec=3;
     let cRob=idx(headCase,['rob','full']); if(cRob<0)cRob=4;
@@ -496,7 +497,13 @@ if(type==='koike'){
       if(colourData)ctx.colourCode=colourData;
       if(markData)ctx.markNo=markData;
       let caseNo=caseNormKoike(r[cCase]);
-      if(isCaseNoKoike(caseNo)){
+      let recRaw=clean(r[cRec]);
+      let useRaw=clean(r[cUse]);
+      let recIsDate=parseInventoryDate(recRaw)?true:false;
+      let useIsDate=parseInventoryDate(useRaw)?true:false;
+      let rowHasSignal=(markData||modelData||setData||colourData||vendorData||factoryData||recIsDate||useIsDate)&&!headerLikeKoike(recRaw)&&!headerLikeKoike(useRaw);
+      if(isCaseNoKoike(caseNo) || rowHasSignal){
+        if(!isCaseNoKoike(caseNo))caseNo='';
         caseRows.push({
           i,r,caseNo,
           mark:normalizeMarkKoike(markData||ctx.markNo),
