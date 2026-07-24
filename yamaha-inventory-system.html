@@ -434,6 +434,7 @@ if(type==='koike'){
       if(headerLikeKoike(s))return false;
       if(/^\d{6}$/.test(s))return true;
       if(/^\d{1,4}-\d{1,4}$/.test(s))return true;
+      if(/^(\d{1,4}(?:-\d{1,4})?)(,\d{1,4}(?:-\d{1,4})?)*$/.test(s))return true;
       if(/^[A-Z0-9]{5,14}$/i.test(s)&&/\d/.test(s))return true;
       return false;
     }
@@ -640,7 +641,7 @@ if(type==='koike'){
       let lotPart=clean(item.lotText);
       if(!lotPart&&!lotFromHeader&&/^\d{6}$/.test(caseNo))lotPart=caseNo.slice(0,3);
       let seqPart=/^\d{6}$/.test(caseNo)?caseNo.slice(3):'';
-      let caseDisplay=/^\d{6}$/.test(caseNo)?caseNo:(item.rawCaseText||caseNo);
+      let caseDisplay=strictCaseColumn?(item.rawCaseText||caseNo):(/^\d{6}$/.test(caseNo)?caseNo:(item.rawCaseText||caseNo));
       let mark=item.mark;
       let markNote='';
       if(mark){
@@ -982,7 +983,7 @@ function renderKoike(){
   if(st)rows=rows.filter(x=>x.inventoryStatus===st);
   rows=filter(rows,q);
   let emptyHint=baseRows.length?'' : '<div class="notice bad"><b>No KOIKE detail rows parsed.</b><br>Please upload the KOIKE detail file that contains CASE NO and Receive/Send date columns.</div>';
-  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div>${emptyHint}<div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-inventory.csv',filter((document.getElementById('kst')?.value?koikeViewRows().filter(x=>x.inventoryStatus===document.getElementById('kst')?.value):koikeViewRows()),document.getElementById('kq')?.value||''))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Number'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
+  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2><div class="notice">KOIKE status priority: Send to HLYM = Used, Received (without send) = In Stock, empty receive/send = Not Received.</div>${emptyHint}<div class="toolbar"><select id="kst" onchange="renderKoike()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option><option value="Not Received" ${st==='Not Received'?'selected':''}>Not Received</option></select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="renderKoike()"><button class="btn secondary" onclick="csvRows('koike-inventory.csv',filter((document.getElementById('kst')?.value?koikeViewRows().filter(x=>x.inventoryStatus===document.getElementById('kst')?.value):koikeViewRows()),document.getElementById('kq')?.value||''))">Export KOIKE CSV</button></div>${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Amount'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sourceSheet',l:'Sheet'}],1000,'koike')}</div>`
 }
 function renderToll(){
   let el=document.getElementById('toll');
