@@ -374,11 +374,12 @@ if(type==='koike'){
       if(idx(hrow,['warehouse','location','wh'])>=0)score+=3;
       if(idx(hrow,['marking no','mark no','marking'])>=0)score+=2;
       if(idx(hrow,['model','part model'])>=0)score+=2;
-      if(idx(hrow,['factory','plant','country'])>=0)score+=1;
+      if(idx(hrow,['factory','fac','plant'])>=0)score+=1;
       if(idx(hrow,['set code','setcode','set'])>=0)score+=1;
       if(idx(hrow,['colour code','color code','colour','color'])>=0)score+=1;
-      if(idx(hrow,['receive','rec date','date receive'])>=0)score+=2;
-      if(idx(hrow,['send to hlym','to hlym','to f3','date back to f3'])>=0)score+=2;
+      if(idx(hrow,['lot','lot no','lot number'])>=0)score+=1;
+      if(idx(hrow,['receive','received','rec date','date receive','receive date'])>=0)score+=2;
+      if(idx(hrow,['send to hlym','to hlym','to f3','date back to f3','pull out hlym','pull out date','pull out'])>=0)score+=2;
       if(hasCase)score+=2;
       if(score>bestScore){bestScore=score;best=hi;}
     }
@@ -392,15 +393,15 @@ if(type==='koike'){
   // New KOIKE compatibility: if a CASE NO structure is detected, map it into master (in-house) records.
   if(cCase>=0 || headerHit.score>=5){
     let cMark=idx(headCase,['marking no','mark no','marking']); if(cMark<0)cMark=1;
-    let cRec=idx(headCase,['rec date','date receive','receive']);
+    let cRec=idx(headCase,['rec date','date receive','receive','received','receive date']);
     let cRob=idx(headCase,['rob','full']); if(cRob<0)cRob=4;
-    let cUse=idx(headCase,['send to hlym','to hlym','to f3','date back to f3']);
+    let cUse=idx(headCase,['send to hlym','to hlym','to f3','date back to f3','pull out hlym','pull out date','pull out']);
     let cLot=idx(headCase,['lot no','lot number','lot']);
     let cSeq=idx(headCase,['seq','remarks']); if(cSeq<0)cSeq=6;
     let cLoc=idx(headCase,['warehouse location','warehouse','wh location','location','wh']); if(cLoc<0)cLoc=0;
     let cVendor=idx(headCase,['vendor','maker','supplier']);
     let cModel=idx(headCase,['model','part model','model name']);
-    let cFactory=idx(headCase,['factory','plant','country']);
+    let cFactory=idx(headCase,['factory','fac','plant']);
     let cSetCode=idx(headCase,['set code','setcode','set','set no']);
     let cColour=idx(headCase,['colour code','color code','colour','color','code warna']);
     let meta=vendorFromInstant(sourceFile,rows);
@@ -476,7 +477,7 @@ if(type==='koike'){
     }
     function headerLikeKoike(x){
       let n=norm(x);
-      return n==='warehouse'||n==='warehouse location'||n==='location'||n==='vendor'||n==='mark no'||n==='marking no'||n==='model'||n==='factory'||n==='set code'||n==='colour code'||n==='color code'||n==='case no'||n==='case number'||n==='receive'||n==='send to hlym'||n==='lot'||n==='lot no'||n==='lot number';
+      return n==='warehouse'||n==='warehouse location'||n==='location'||n==='vendor'||n==='mark no'||n==='marking no'||n==='model'||n==='factory'||n==='fac'||n==='set code'||n==='colour code'||n==='color code'||n==='case no'||n==='case number'||n==='receive'||n==='received'||n==='send to hlym'||n==='pull out hlym'||n==='pull out date'||n==='lot'||n==='lot no'||n==='lot number';
     }
     function cleanWarehouseKoike(x){
       let s=clean(x);
@@ -520,6 +521,7 @@ if(type==='koike'){
       }
       return best;
     }
+    let strictCaseColumn=(idx(headCase,['case no','case number','case no.','case #'])>=0);
     function pickRowDates(row){
       let out=[];
       let cols=(row||[]).length;
@@ -536,6 +538,8 @@ if(type==='koike'){
       let foundCase=findBestColumn(hCase+1,function(v){return isCaseLikeKoike(v)},protectedCols);
       if(foundCase.score>0)cCase=foundCase.col;
     }
+    let recFromHeader=cRec>=0;
+    let useFromHeader=cUse>=0;
     if(cRec<0)cRec=3;
     if(cUse<0)cUse=5;
     let recScore=scanColumnScore(hCase+1,cRec,function(v){return !!parseInventoryDate(v)});
@@ -548,10 +552,12 @@ if(type==='koike'){
       let foundUse=findBestColumn(hCase+1,function(v){return !!parseInventoryDate(v)},protectedCols.concat([cCase,cRec]));
       if(foundUse.score>0)cUse=foundUse.col;
     }
-    // Smart date role assignment: receive is typically the denser date column, send is the sparser one.
-    let dateColA={col:cRec,score:scanColumnScore(hCase+1,cRec,function(v){return !!parseInventoryDate(v)})};
-    let dateColB={col:cUse,score:scanColumnScore(hCase+1,cUse,function(v){return !!parseInventoryDate(v)})};
-    if(dateColB.score>dateColA.score){let t=cRec;cRec=cUse;cUse=t;}
+    // Smart date role assignment: only auto-swap when one or both date columns were not explicitly matched by header.
+    if(!(recFromHeader&&useFromHeader)){
+      let dateColA={col:cRec,score:scanColumnScore(hCase+1,cRec,function(v){return !!parseInventoryDate(v)})};
+      let dateColB={col:cUse,score:scanColumnScore(hCase+1,cUse,function(v){return !!parseInventoryDate(v)})};
+      if(dateColB.score>dateColA.score){let t=cRec;cRec=cUse;cUse=t;}
+    }
     let lotScore=scanColumnScore(hCase+1,cLot,function(v){
       let s=clean(v);
       if(!s||headerLikeKoike(s))return false;
@@ -597,7 +603,7 @@ if(type==='koike'){
       if(markData)ctx.markNo=markData;
       let caseNo=caseNormKoike(r[cCase]);
       let excludedSet=new Set([vendorData,modelData,factoryData,setData,colourData,markData,ctx.vendor,ctx.model,ctx.factory,ctx.setCode,ctx.colourCode,ctx.markNo].filter(Boolean).map(function(v){return String(v).toUpperCase()}));
-      if(!isCaseLikeKoike(caseNo))caseNo=pickRowCase(r,excludedSet);
+      if(!isCaseLikeKoike(caseNo) && !strictCaseColumn)caseNo=pickRowCase(r,excludedSet);
       let rawCaseText=columnValue(r,cCase);
       let lotText=columnValue(r,cLot);
       let recRaw=clean(r[cRec]);
@@ -624,7 +630,8 @@ if(type==='koike'){
     let currentMark='',currentColour='',blockNo=0,blockStartRow=0,lastBlockOrder='';
     for(let ci=0;ci<caseRows.length;ci++){
       let item=caseRows[ci],i=item.i,r=item.r,caseNo=item.caseNo;
-      let lotPart=/^\d{6}$/.test(caseNo)?caseNo.slice(0,3):clean(item.lotText);
+      let lotPart=clean(item.lotText);
+      if(!lotPart&&/^\d{6}$/.test(caseNo))lotPart=caseNo.slice(0,3);
       let seqPart=/^\d{6}$/.test(caseNo)?caseNo.slice(3):'';
       let caseDisplay=/^\d{6}$/.test(caseNo)?caseNo:(item.rawCaseText||caseNo);
       let mark=item.mark;
