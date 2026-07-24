@@ -456,19 +456,18 @@ if(type==='line123'){
   }
   function isOrderNoLine123(x){
     let s=clean(x); if(!s)return false;
-    // Order Nos are always single-word tokens — no internal spaces
-    if(/\s/.test(s))return false;
+    // Order Nos are strictly: start with a letter, purely alphanumeric (no spaces/slashes/dashes), 5–10 chars.
+    // This is a positive gate — anything that doesn't match the shape is rejected immediately.
+    if(!/^[A-Za-z][A-Za-z0-9]{4,9}$/.test(s))return false;
     if(isDetailOrSubPartLine123(s))return false;
-    let compact=s.replace(/[^A-Za-z0-9]/g,'');
-    if(compact.length<4)return false;
-    if(/^\d+$/.test(compact))return false;
     return true;
   }
   function findNearestOrderLine123(caseRows,pos,fallback){
-    // CASE NO is the anchor. For a case row with a note instead of an order, search the surrounding case rows for the nearest valid Order No.
+    // CASE NO is the anchor. Search surrounding case rows for the nearest valid Order No.
     for(let k=pos;k>=0;k--){let m=caseRows[k].mark;if(isOrderNoLine123(m))return m;}
     for(let k=pos+1;k<caseRows.length&&k<=pos+80;k++){let m=caseRows[k].mark;if(isOrderNoLine123(m))return m;}
-    return fallback||'';
+    // Only use fallback if it also passes strict Order No validation
+    return (fallback&&isOrderNoLine123(fallback))?fallback:'';
   }
   let caseRows=[];
   for(let i=h+1;i<rows.length;i++){
