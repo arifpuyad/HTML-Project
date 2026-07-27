@@ -346,6 +346,30 @@ function normalizeInhouseCaseNo(v){
   if(/^\d+$/.test(s))s=s.padStart(6,'0');
   return /^\d{6}$/.test(s)?s:'';
 }
+function pad3Numeric(v){
+  let s=clean(v).replace(/\s+/g,'');
+  if(!s)return '';
+  if(/^\d+(?:\.0+)?$/.test(s))return String(Math.trunc(Number(s))).padStart(3,'0');
+  return '';
+}
+function normalizeInhouseDisplayRow(row){
+  let caseNo=clean(row.caseNo);
+  let lotNo=clean(row.lotNo);
+  let caseSeq=clean(row.caseSeq);
+  let fullCase=normalizeInhouseCaseNo(caseNo);
+  if(fullCase){
+    caseNo=fullCase;
+    lotNo=fullCase.slice(0,3);
+    caseSeq=fullCase.slice(3);
+  }else{
+    let lotPad=pad3Numeric(lotNo);
+    let seqPad=pad3Numeric(caseSeq);
+    if(lotPad)lotNo=lotPad;
+    if(seqPad)caseSeq=seqPad;
+    if(!seqPad && lotPad && /^\d{1,3}\s*-\s*\d{1,3}$/.test(caseNo))caseSeq=lotPad;
+  }
+  return Object.assign({},row,{caseNo,lotNo,caseSeq});
+}
 /**
  * Extracts vendor information from container filename
  * @param {string} name - Filename to parse
@@ -927,6 +951,7 @@ function resetInhouseView(){
 function renderInhouse(){
   let el=document.getElementById('inhouse');
   if(!hasData()){el.innerHTML=noData('In-house cases empty until generated');return}
+  let baseRows=AppState.db.lineCases.map(normalizeInhouseDisplayRow);
   let q=el.querySelector('#q')?.value||'',
       v=el.querySelector('#ven')?.value||'',
       ln=el.querySelector('#lineF')?.value||'',
@@ -948,24 +973,24 @@ function renderInhouse(){
   function normalizeFilters(){
     for(let i=0;i<6;i++){
       let changed=false;
-      let models=unique(applySelected(AppState.db.lineCases,'modelFull'),'modelFull');if(m&&!models.includes(m)){m='';changed=true;}
-      let vendors=unique(applySelected(AppState.db.lineCases,'vendor'),'vendor');if(v&&!vendors.includes(v)){v='';changed=true;}
-      let lines=unique(applySelected(AppState.db.lineCases,'line'),'line');if(ln&&!lines.includes(ln)){ln='';changed=true;}
-      let orders=unique(applySelected(AppState.db.lineCases,'orderNo'),'orderNo');if(ord&&!orders.includes(ord)){ord='';changed=true;}
-      let cases=unique(applySelected(AppState.db.lineCases,'caseNo'),'caseNo');if(cas&&!cases.includes(cas)){cas='';changed=true;}
-      let statuses=statusList(applySelected(AppState.db.lineCases,'status'));if(st&&!statuses.includes(st)){st='';changed=true;}
+      let models=unique(applySelected(baseRows,'modelFull'),'modelFull');if(m&&!models.includes(m)){m='';changed=true;}
+      let vendors=unique(applySelected(baseRows,'vendor'),'vendor');if(v&&!vendors.includes(v)){v='';changed=true;}
+      let lines=unique(applySelected(baseRows,'line'),'line');if(ln&&!lines.includes(ln)){ln='';changed=true;}
+      let orders=unique(applySelected(baseRows,'orderNo'),'orderNo');if(ord&&!orders.includes(ord)){ord='';changed=true;}
+      let cases=unique(applySelected(baseRows,'caseNo'),'caseNo');if(cas&&!cases.includes(cas)){cas='';changed=true;}
+      let statuses=statusList(applySelected(baseRows,'status'));if(st&&!statuses.includes(st)){st='';changed=true;}
       if(!changed)break;
     }
   }
   normalizeFilters();
 
-  let modelOptions=unique(applySelected(AppState.db.lineCases,'modelFull'),'modelFull');
-  let vendorOptions=unique(applySelected(AppState.db.lineCases,'vendor'),'vendor');
-  let lineOptions=unique(applySelected(AppState.db.lineCases,'line'),'line');
-  let orderOptions=unique(applySelected(AppState.db.lineCases,'orderNo'),'orderNo');
-  let caseOptions=unique(applySelected(AppState.db.lineCases,'caseNo'),'caseNo');
-  let statusOptions=statusList(applySelected(AppState.db.lineCases,'status'));
-  let rows=filter(applySelected(AppState.db.lineCases,null),q);
+  let modelOptions=unique(applySelected(baseRows,'modelFull'),'modelFull');
+  let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
+  let lineOptions=unique(applySelected(baseRows,'line'),'line');
+  let orderOptions=unique(applySelected(baseRows,'orderNo'),'orderNo');
+  let caseOptions=unique(applySelected(baseRows,'caseNo'),'caseNo');
+  let statusOptions=statusList(applySelected(baseRows,'status'));
+  let rows=filter(applySelected(baseRows,null),q);
 
   let filteredActive=q||v||ln||st||m||ord||cas||AppState.showAll;
   let totalRows=rows.length;
@@ -985,7 +1010,7 @@ function getInhouseFiltered(){
       m=document.getElementById('modelF')?.value||'',
       ord=document.getElementById('orderF')?.value||'',
       cas=document.getElementById('caseF')?.value||'';
-  let rows=AppState.db.lineCases;
+  let rows=AppState.db.lineCases.map(normalizeInhouseDisplayRow);
   if(v)rows=rows.filter(x=>x.vendor===v);
   if(ln)rows=rows.filter(x=>x.line===ln);
   if(m)rows=rows.filter(x=>x.modelFull===m);
