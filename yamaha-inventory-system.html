@@ -370,6 +370,31 @@ function normalizeInhouseDisplayRow(row){
   }
   return Object.assign({},row,{caseNo,lotNo,caseSeq});
 }
+function collapseInhouseRows(rows){
+  let out=[],seen={};
+  function statusRank(s){
+    s=clean(s);
+    if(s==='Used')return 3;
+    if(s==='In Stock')return 2;
+    if(s==='Not Received')return 1;
+    return 0;
+  }
+  rows.forEach(function(row){
+    let vendor=clean(row.vendor),line=clean(row.line),caseNo=clean(row.caseNo);
+    let isTymLine4=(vendor==='TYM'&&line==='Line 4'&&!!normalizeInhouseCaseNo(caseNo));
+    if(!isTymLine4){out.push(row);return;}
+    let key=[vendor,line,clean(row.modelFull),clean(row.endCode),clean(row.orderNo),clean(row.colourCode),caseNo].join('|');
+    if(!seen[key]){seen[key]=Object.assign({},row);out.push(seen[key]);return;}
+    let target=seen[key];
+    if(statusRank(row.status)>statusRank(target.status))target.status=row.status;
+    if(!clean(target.dateUse)&&clean(row.dateUse))target.dateUse=row.dateUse;
+    if(!clean(target.dateReceive)&&clean(row.dateReceive))target.dateReceive=row.dateReceive;
+    if(!clean(target.expectedReceive)&&clean(row.expectedReceive))target.expectedReceive=row.expectedReceive;
+    if(!clean(target.seq)&&clean(row.seq))target.seq=row.seq;
+    if(!clean(target.robFull)&&clean(row.robFull))target.robFull=row.robFull;
+  });
+  return out;
+}
 /**
  * Extracts vendor information from container filename
  * @param {string} name - Filename to parse
@@ -993,7 +1018,7 @@ function resetInhouseView(){
 function renderInhouse(){
   let el=document.getElementById('inhouse');
   if(!hasData()){el.innerHTML=noData('In-house cases empty until generated');return}
-  let baseRows=AppState.db.lineCases.map(normalizeInhouseDisplayRow);
+  let baseRows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
   let q=el.querySelector('#q')?.value||'',
       v=el.querySelector('#ven')?.value||'',
       ln=el.querySelector('#lineF')?.value||'',
@@ -1053,7 +1078,7 @@ function getInhouseFiltered(){
       m=document.getElementById('modelF')?.value||'',
       ord=document.getElementById('orderF')?.value||'',
       cas=document.getElementById('caseF')?.value||'';
-  let rows=AppState.db.lineCases.map(normalizeInhouseDisplayRow);
+  let rows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
   if(v)rows=rows.filter(x=>x.vendor===v);
   if(ln)rows=rows.filter(x=>x.line===ln);
   if(m)rows=rows.filter(x=>x.modelFull===m);
