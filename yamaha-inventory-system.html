@@ -937,16 +937,18 @@ function statusSummaryHTML(rows,statusKey){
   return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">Lot In Stock</div><div class="value">${fmt(stock)}</div></div><div class="kpi"><div class="label">Lot Used</div><div class="value">${fmt(used)}</div></div></div>`;
 }
 function inhouseLotSummaryHTML(rows){
-  let stockRows=rows.filter(function(x){return clean(x.status)==='In Stock';});
   let lots={};
-  stockRows.forEach(function(r){
+  rows.forEach(function(r){
     let model=clean(r.modelFull||r.modelName);
     let lot=clean(r.lotNo);
     if(!model||!lot)return;
     let lotKey=[clean(r.vendor),clean(r.line),model,lot].join('|');
-    if(!lots[lotKey])lots[lotKey]={model:model,cases:new Set()};
+    if(!lots[lotKey])lots[lotKey]={model:model,cases:new Set(),stockCases:new Set(),usedCases:new Set()};
     let caseId=clean(r.caseSeq)||clean(r.caseNo);
     if(caseId)lots[lotKey].cases.add(caseId);
+    let st=clean(r.status);
+    if(caseId&&st==='In Stock')lots[lotKey].stockCases.add(caseId);
+    if(caseId&&st==='Used')lots[lotKey].usedCases.add(caseId);
   });
   let modelCaseCounts={};
   Object.keys(lots).forEach(function(k){
@@ -964,14 +966,16 @@ function inhouseLotSummaryHTML(rows){
     });
     return bestCount;
   }
-  let freezeLot=0,totalLot=0;
+  let freezeLot=0,lotInStock=0;
   Object.keys(lots).forEach(function(k){
-    totalLot++;
     let item=lots[k];
+    if(item.stockCases.size===0)return;
     let standard=standardCountForModel(item.model);
-    if(standard>0&&item.cases.size<standard)freezeLot++;
+    let missingFromStandard=(standard>0&&item.cases.size<standard);
+    let partiallyUsed=(item.usedCases.size>0);
+    if(missingFromStandard||partiallyUsed)freezeLot++;
+    else lotInStock++;
   });
-  let lotInStock=Math.max(0,totalLot-freezeLot);
   return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">Lot in Stock</div><div class="value">${fmt(lotInStock)}</div></div><div class="kpi"><div class="label">Freeze Lot</div><div class="value">${fmt(freezeLot)}</div></div></div>`;
 }
 function filter(rows,q){q=(q||'').toLowerCase();return q?rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q))):rows}
@@ -1029,10 +1033,11 @@ function renderInhouse(){
   let caseOptions=unique(applySelected(baseRows,'caseNo'),'caseNo');
   let statusOptions=statusList(applySelected(baseRows,'status'));
   let rows=filter(applySelected(baseRows,null),q);
+  let summaryRows=filter(applySelected(baseRows,'status'),q);
 
   let filteredActive=q||v||ln||st||m||ord||cas||AppState.showAll;
   let totalRows=rows.length;
-  let summaryHtml=inhouseLotSummaryHTML(rows);
+  let summaryHtml=inhouseLotSummaryHTML(summaryRows);
   let start=(AppState.inhousePage-1)*AppState.inhousePageSize;
   let totalPages=Math.max(1,Math.ceil(totalRows/AppState.inhousePageSize));
   if(AppState.inhousePage>totalPages){AppState.inhousePage=1;start=0;}
