@@ -740,13 +740,16 @@ if(type==='line123'){
   let cRob=idx(head,['rob','full']); if(cRob<0)cRob=4;
   let cUse=idx(head,['to f3','date back to f3']); if(cUse<0)cUse=5;
   let cSeq=idx(head,['seq','remarks']); if(cSeq<0)cSeq=6;
-  let sheetModel='';
-  for(let mi=0;mi<Math.min(rows.length,8);mi++){
-    let r=rows[mi]||[];
-    for(let mj=0;mj<Math.min(r.length,4);mj++){
-      if(norm(r[mj]).includes('model')){sheetModel=clean(r[mj+1]||r[mj]).replace(/^model\s*:?\s*/i,'');break}
+  // Model is usually written directly in column B, row 2 (no "Model:" label). Prefer that cell first.
+  let sheetModel=clean(rows[1]?.[1]);
+  if(!sheetModel){
+    for(let mi=0;mi<Math.min(rows.length,8);mi++){
+      let r=rows[mi]||[];
+      for(let mj=0;mj<Math.min(r.length,4);mj++){
+        if(norm(r[mj]).includes('model')){sheetModel=clean(r[mj+1]||r[mj]).replace(/^model\s*:?\s*/i,'');break}
+      }
+      if(sheetModel)break;
     }
-    if(sheetModel)break;
   }
   sheetModel=sheetModel||sheet;
   function caseNorm123(x){let s=clean(x).replace(/^'/,''); if(/^\d+$/.test(s))s=s.padStart(6,'0'); return s}
@@ -901,7 +904,7 @@ function statusSummaryHTML(rows,statusKey){
   statusKey=statusKey||'status';
   let stock=rows.filter(function(x){return clean(x[statusKey])==='In Stock';}).length;
   let used=rows.filter(function(x){return clean(x[statusKey])==='Used';}).length;
-  return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">In stock</div><div class="value">${fmt(stock)}</div></div><div class="kpi"><div class="label">Used</div><div class="value">${fmt(used)}</div></div></div>`;
+  return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">Lot In Stock</div><div class="value">${fmt(stock)}</div></div><div class="kpi"><div class="label">Lot Used</div><div class="value">${fmt(used)}</div></div></div>`;
 }
 function filter(rows,q){q=(q||'').toLowerCase();return q?rows.filter(r=>Object.values(r).some(v=>String(v).toLowerCase().includes(q))):rows}
 function unique(rows,k){return [...new Set(rows.map(x=>x[k]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}))}
