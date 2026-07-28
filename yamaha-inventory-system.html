@@ -503,54 +503,6 @@ body.flow-app header{display:block}.layout{display:grid;grid-template-columns:25
   right: 18px !important;
 }
 
-/* Smaller bike movement path */
-@keyframes bikeRide {
-  0% {
-   *transform: translateX(-62px) trans*ateY(0) rotate(-1deg);
-  }
-
-  12% *
-    transform: translateX(3vw) tr*nslateY(-1px) rotate(0deg);
-  }
-
- *48% {
-    transform: translateX(41*w) translateY(1px) rotate(1deg);
- *}
-
-  82% {
-    transform: translat*X(calc(min(720px, 94vw) - 118px)) *ranslateY(-1px) rotate(0deg);
-  }
-*  100% {
-    transform: translateX*calc(min(720px, 94vw) + 62px)) translateY(0) rotate(1deg);
-  }
-}
-
-/* Mobile size */
-@media(max-width:640px) {
-  #loa*ingOverlay .loader-title {
-    fon*-size: 17px !important;
-    letter*spacing: .07em !important;
-  }
-
-  *loader-bike {
-    width: 40px !imp*rtant;
-    height: 20px !important*
-    bottom: 35px !important;
-  }
-*  .loader-bike img.loader-bike-img*{
-    width: 40px !important;
-  }
-*  .loader-bike .exhaust {
-    left* -9px !important;
-    top: 13px !i*portant;
-    width: 12px !importan*;
-  }
-
-  .loader-zero,
-  .loader-h*ndred {
-    font-size: 9px !import*nt;
-  }
-}
 
 
 /* ==========================================================
@@ -577,7 +529,7 @@ body.flow-app header{display:block}.layout{display:grid;grid-template-columns:25
 </head>
 <body>
 <div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
-<div id="loadingOverlay"><div class="loader-card"><div class="loader-title">Processing Inventory Data</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
+<div id="loadingOverlay"><div class="loader-card"><div class="loader-title">PROCESSING INVENTORY DATA</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
 <header><div class="top"><div class="brand-lockup"><img src="yamaha-title-logo.jpg" class="brand-logo-img" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
 <div class="layout">
 
