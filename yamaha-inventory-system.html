@@ -146,7 +146,7 @@ nav button:before{content:"";position:absolute;left:0;top:0;height:100%;width:4p
 <div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
 <div id="loadingOverlay"><div class="loader-card"><div class="loader-title">Processing Inventory Data</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
 <header><div class="top"><div class="brand-lockup"><img src="yamaha-title-logo.jpg" class="brand-logo-img" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
-<div class="layout"><nav id="nav"><button data-v="upload" class="active" onclick="show('upload')">Upload & Generate</button><button data-v="inhouse" onclick="show('inhouse')">In-House Inventory</button><button data-v="koike" onclick="show('koike')">KOIKE Inventory</button><button data-v="toll" onclick="show('toll')">Toll Global Inventory</button><button data-v="settings" onclick="show('settings')">Export & Settings</button></nav>
+<div class="layout"><nav id="nav"><button data-v="upload" class="active">Upload & Generate</button><button data-v="inhouse">In-House Inventory</button><button data-v="koike">KOIKE Inventory</button><button data-v="toll">Toll Global Inventory</button><button data-v="settings">Export & Settings</button></nav>
 <main class="content"><section id="upload" class="view"></section><section id="inhouse" class="view" hidden></section><section id="koike" class="view" hidden></section><section id="toll" class="view" hidden></section><section id="settings" class="view" hidden></section><section id="dash" class="view" hidden></section><footer>Design and Code by Muhammad Arif</footer></main></div>
 <script>
 // ==================== APPLICATION STATE ====================
@@ -206,8 +206,6 @@ function requireSafetyConfirmation(actionLabel,phrase){
 }
 // Global error handler
 window.addEventListener('error',function(e){var log=document.getElementById('log');if(log){log.innerHTML='<div class="notice bad"><b>Script error:</b> '+(e.message||'Unknown error')+'</div>';}});
-// Single event listener for all button clicks to show loader (consolidated from 4 duplicate listeners)
-document.addEventListener("click",function(e){if(e.target.closest("button")){showLoader("Updating inventory view...");setTimeout(hideLoader,300);}});
 /**
  * Checks if there is any loaded data
  * @returns {boolean} True if database contains data
@@ -220,12 +218,50 @@ function num(x){return Number(String(x??'0').replace(/,/g,''))||0}
 function norm(x){return clean(x).toLowerCase().replace(/\s+/g,' ')}
 function getBaseModel(full){
   if(!full)return '';
-  let part = String(full).split(/[-\s]/)[0];
-  return part.trim().toUpperCase();
+
+  let txt=String(full).trim().toUpperCase();
+
+  // Smart base model grouping:
+  // D5G1 -> D5G1
+  // D5G1 A3 010A -> D5G1
+  // D5G1-010A -> D5G1
+  // D5G1-010B -> D5G1
+  // BNT1A8-010A -> BNT1A8
+  let firstPart=txt.split(/\s+/)[0];
+  firstPart=firstPart.split('-')[0];
+
+  return firstPart.trim();
 }
 function dval(x){return clean(x)}
 function fileKey(f){return [f.name,f.size,f.lastModified].join('|')}
-function ensureXLSX(){return new Promise(function(resolve,reject){if(window.XLSX){resolve();return}var log=document.getElementById('log');if(log){log.innerHTML='<div class="parser-loader"><div class="parser-pulse">Preparing Inventory Engine</div><div style="font-size:13px;color:#64748b">Loading Excel Processing Library (XLSX Parser)</div><div class="parser-bar"><div class="parser-fill"></div></div><div style="font-size:12px;color:#64748b;margin-top:8px">Please wait while the inventory engine initializes...</div></div>'}var sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';sc.onload=function(){resolve()};sc.onerror=function(){reject(new Error('Excel parser could not load. Download this HTML and open it locally in Edge/Chrome, then allow internet access for the parser.'))};document.head.appendChild(sc);});}
+function ensureXLSX(){
+  return new Promise(function(resolve,reject){
+    if(window.XLSX){
+      resolve();
+      return;
+    }
+
+    var log=document.getElementById('log');
+    if(log){
+      log.innerHTML=
+        '<div class="parser-loader">'+
+        '<div class="parser-pulse">Preparing Inventory Engine</div>'+
+        '<div style="font-size:13px;color:#64748b">Loading Excel Processing Library (XLSX Parser)</div>'+
+        '<div class="parser-bar"><div class="parser-fill"></div></div>'+
+        '<div style="font-size:12px;color:#64748b;margin-top:8px">Please wait while the inventory engine initializes...</div>'+
+        '</div>';
+    }
+
+    var sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    sc.onload=function(){resolve()};
+    sc.onerror=function(){
+      reject(new Error('Excel parser could not load. Please check internet access or open this HTML in Edge/Chrome.'));
+    };
+    document.head.appendChild(sc);
+  });
+}
+
 /**
  * Sets files for a given type with validation
  * @param {FileList} list - Files to upload
@@ -233,18 +269,29 @@ function ensureXLSX(){return new Promise(function(resolve,reject){if(window.XLSX
  */
 function setFiles(list,type){
   let incoming=Array.from(list||[]);
-  // Validate file sizes (max 50MB per file)
+
   let oversized=incoming.filter(f=>f.size>MAX_FILE_SIZE).map(f=>f.name);
   if(oversized.length>0){
     var log=document.getElementById('log');
-    if(log)log.innerHTML='<div class="notice bad"><b>File size error:</b> '+oversized.join(', ')+' exceed 1GB limit. Please use smaller files.</div>';
+    if(log){
+      log.innerHTML='<div class="notice bad"><b>File size error:</b> '+oversized.join(', ')+' exceed 1GB limit. Please use smaller files.</div>';
+    }
     return;
   }
+
   if(type==='line'||type==='line123'){
     let seen=new Set(AppState.files[type].map(fileKey));
-    incoming.forEach(f=>{if(!seen.has(fileKey(f))){AppState.files[type].push(f);seen.add(fileKey(f))}})}
-  else{AppState.files[type]=incoming}
-  renderUpload()
+    incoming.forEach(function(f){
+      if(!seen.has(fileKey(f))){
+        AppState.files[type].push(f);
+        seen.add(fileKey(f));
+      }
+    });
+  }else{
+    AppState.files[type]=incoming;
+  }
+
+  renderUpload();
 }
 function removeLineFile(type,i){AppState.files[type].splice(i,1);renderUpload()}
 function clearType(type){AppState.files[type]=[];renderUpload()}
@@ -1014,11 +1061,7 @@ function opt(list,val,label){return `<option value="">${label}</option>`+list.ma
 function goInhouseFirst(){AppState.inhousePage=1;renderInhouse();}
 function goInhouseLast(totalPages){AppState.inhousePage=totalPages;renderInhouse();}
 function goInhousePage(dir){AppState.inhousePage=Math.max(1,AppState.inhousePage+dir);renderInhouse();}
-function getBaseModel(full){
-  if(!full)return '';
-  let part = String(full).split(/[-\s]/)[0];
-  return part.trim().toUpperCase();
-}
+
 function resetInhouseView(){
   AppState.showAll=false;
   AppState.inhousePage=1;
@@ -1065,7 +1108,14 @@ function renderInhouse(){
   }
   normalizeFilters();
 
-  let baseModelOptions=unique(applySelected(baseRows,'baseModel').map(x=>getBaseModel(x.modelFull)),'');
+  let baseModelOptions=
+  [
+    ...new Set(
+      applySelected(baseRows,'baseModel')
+      .map(x=>getBaseModel(x.modelFull))
+      .filter(Boolean)
+    )
+  ].sort();
   let modelOptions=bm?unique(applySelected(baseRows,'modelFull'),'modelFull'):[];
   let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
   let lineOptions=unique(applySelected(baseRows,'line'),'line');
@@ -1083,7 +1133,37 @@ function renderInhouse(){
   if(AppState.inhousePage>totalPages){AppState.inhousePage=1;start=0;}
   let pageRows=rows.slice(start,start+AppState.inhousePageSize);
   
-  let variantFilterHtml = bm ? `<select id="modelF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(modelOptions,m,'Filter Variant/Model')}</select>` : '';
+  let variantFilterHtml = '';
+
+if (bm) {
+
+    let variants =
+        [...new Set(
+            baseRows
+                .filter(x => getBaseModel(x.modelFull) === bm)
+                .map(x => x.modelFull)
+        )]
+        .sort();
+
+    variantFilterHtml =
+    `
+    <select id="modelF"
+        onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+
+        <option value="">
+            All ${bm} Variants
+        </option>
+
+        ${variants.map(v =>
+            `<option value="${esc(v)}"
+                ${v === m ? 'selected' : ''}>
+                ${esc(v)}
+            </option>`
+        ).join('')}
+
+    </select>
+    `;
+}
 
   el.innerHTML=`<div class="panel"><h2>In-House Inventory</h2><div class="notice">Please filter the require information for your viewing</div><div class="toolbar"><select id="baseModelF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(baseModelOptions,bm,'Filter Base Model')}</select>${variantFilterHtml}<select id="ven" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(vendorOptions,v,'All vendors')}</select><select id="lineF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(lineOptions,ln,'All lines')}</select><select id="orderF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(orderOptions,ord,'Filter Order No')}</select><select id="caseF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(caseOptions,cas,'Filter Case No')}</select><select id="st" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><input id="q" placeholder="Search model, order, case, colour..." value="${esc(q)}" oninput="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><button class="btn secondary" onclick="AppState.showAll=true;AppState.inhousePage=1;renderInhouse()">Show All</button><button class="btn secondary" onclick="resetInhouseView()">Reset View</button><button class="btn secondary" onclick="csvRows('inhouse-filtered.csv',getInhouseFiltered())">Export Filtered CSV</button></div>${summaryHtml}${filteredActive?(t(pageRows,[{k:'status',l:'Status',f:pill},{k:'vendor',l:'Vendor'},{k:'line',l:'Line'},{k:'modelFull',l:'Model'},{k:'endCode',l:'Sheet'},{k:'orderNo',l:'Order No'},{k:'colourCode',l:'Colour Code'},{k:'caseNo',l:'Case No'},{k:'lotNo',l:'Lot'},{k:'caseSeq',l:'Case'},{k:'dateReceive',l:'Actual Receive'},{k:'expectedReceive',l:'Expected Receive'},{k:'robFull',l:'R/F'},{k:'dateUse',l:'Date Use'},{k:'seq',l:'SEQ'},{k:'sourceRow',l:'Excel Row'}],10000,'inhouse')+`<div class='toolbar'><button class='btn secondary' onclick='goInhouseFirst()'>First</button><button class='btn secondary' onclick='goInhousePage(-1)'>Previous</button><span>Page ${AppState.inhousePage} of ${totalPages}</span><button class='btn secondary' onclick='goInhousePage(1)'>Next</button><button class='btn secondary' onclick='goInhouseLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 5,000 rows (updated for better performance).</p>`):'<div class="empty"><div><h2>Select a filter to list data</h2><p class="hint">Please filter the data needed</p></div></div>'}</div>`
 
@@ -1239,6 +1319,361 @@ function clearAll(){
   if(!createSafetyBackup('clear-all'))return;
   AppState.db=emptyDB();AppState.sort={};AppState.showAll=false;renderAll();hideLoader();show('upload')
 }
+
+// ==================== IN-HOUSE FILTER FIX PATCH ====================
+
+// Store In-House filter values safely so they do not disappear when renderInhouse() rebuilds the page.
+AppState.filters = AppState.filters || {
+  q:'',
+  bm:'',
+  m:'',
+  v:'',
+  ln:'',
+  st:'',
+  ord:'',
+  cas:''
+};
+
+function resetInhouseView(){
+  AppState.showAll=false;
+  AppState.inhousePage=1;
+
+  AppState.filters={
+    q:'',
+    bm:'',
+    m:'',
+    v:'',
+    ln:'',
+    st:'',
+    ord:'',
+    cas:''
+  };
+
+  renderInhouse();
+}
+
+function renderInhouse(){
+  let el=document.getElementById('inhouse');
+
+  if(!hasData()){
+    el.innerHTML=noData('In-house cases empty until generated');
+    return;
+  }
+
+  let baseRows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+
+  let q   = AppState.filters.q || '';
+  let bm  = AppState.filters.bm || '';
+  let m   = AppState.filters.m || '';
+  let v   = AppState.filters.v || '';
+  let ln  = AppState.filters.ln || '';
+  let st  = AppState.filters.st || '';
+  let ord = AppState.filters.ord || '';
+  let cas = AppState.filters.cas || '';
+
+  function applySelected(rows,skip){
+    if(skip!=='baseModel' && bm){
+      rows=rows.filter(x=>getBaseModel(x.modelFull)===bm);
+    }
+
+    if(skip!=='modelFull' && m){
+      rows=rows.filter(x=>x.modelFull===m);
+    }
+
+    if(skip!=='vendor' && v){
+      rows=rows.filter(x=>x.vendor===v);
+    }
+
+    if(skip!=='line' && ln){
+      rows=rows.filter(x=>x.line===ln);
+    }
+
+    if(skip!=='orderNo' && ord){
+      rows=rows.filter(x=>x.orderNo===ord);
+    }
+
+    if(skip!=='caseNo' && cas){
+      rows=rows.filter(x=>x.caseNo===cas);
+    }
+
+    if(skip!=='status' && st){
+      rows=rows.filter(x=>x.status===st);
+    }
+
+    return rows;
+  }
+
+  function statusList(rows){
+    let has=new Set(rows.map(x=>x.status).filter(Boolean));
+    return ['In Stock','Used','Not Received'].filter(x=>has.has(x));
+  }
+
+  function baseModelList(rows){
+    return [
+      ...new Set(
+        rows
+          .map(x=>getBaseModel(x.modelFull))
+          .filter(Boolean)
+      )
+    ].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+  }
+
+  function syncFiltersToState(){
+    AppState.filters.q=q;
+    AppState.filters.bm=bm;
+    AppState.filters.m=m;
+    AppState.filters.v=v;
+    AppState.filters.ln=ln;
+    AppState.filters.st=st;
+    AppState.filters.ord=ord;
+    AppState.filters.cas=cas;
+  }
+
+  function normalizeFilters(){
+    for(let i=0;i<8;i++){
+      let changed=false;
+
+      let baseModels=baseModelList(applySelected(baseRows,'baseModel'));
+      if(bm && !baseModels.includes(bm)){
+        bm='';
+        m='';
+        changed=true;
+      }
+
+      let models=unique(applySelected(baseRows,'modelFull'),'modelFull');
+      if(m && !models.includes(m)){
+        m='';
+        changed=true;
+      }
+
+      let vendors=unique(applySelected(baseRows,'vendor'),'vendor');
+      if(v && !vendors.includes(v)){
+        v='';
+        changed=true;
+      }
+
+      let lines=unique(applySelected(baseRows,'line'),'line');
+      if(ln && !lines.includes(ln)){
+        ln='';
+        changed=true;
+      }
+
+      let orders=unique(applySelected(baseRows,'orderNo'),'orderNo');
+      if(ord && !orders.includes(ord)){
+        ord='';
+        changed=true;
+      }
+
+      let cases=unique(applySelected(baseRows,'caseNo'),'caseNo');
+      if(cas && !cases.includes(cas)){
+        cas='';
+        changed=true;
+      }
+
+      let statuses=statusList(applySelected(baseRows,'status'));
+      if(st && !statuses.includes(st)){
+        st='';
+        changed=true;
+      }
+
+      if(!changed)break;
+    }
+
+    syncFiltersToState();
+  }
+
+  normalizeFilters();
+
+  let baseModelOptions=baseModelList(applySelected(baseRows,'baseModel'));
+
+  let variantOptions=bm
+    ? unique(applySelected(baseRows,'modelFull'),'modelFull')
+    : [];
+
+  let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
+  let lineOptions=unique(applySelected(baseRows,'line'),'line');
+  let orderOptions=unique(applySelected(baseRows,'orderNo'),'orderNo');
+  let caseOptions=unique(applySelected(baseRows,'caseNo'),'caseNo');
+  let statusOptions=statusList(applySelected(baseRows,'status'));
+
+  let rows=filter(applySelected(baseRows,null),q);
+  let summaryRows=filter(applySelected(baseRows,'status'),q);
+
+  let filteredActive=q||bm||m||v||ln||st||ord||cas||AppState.showAll;
+
+  let totalRows=rows.length;
+  let summaryHtml=inhouseLotSummaryHTML(summaryRows);
+
+  let totalPages=Math.max(1,Math.ceil(totalRows/AppState.inhousePageSize));
+
+  if(AppState.inhousePage>totalPages){
+    AppState.inhousePage=1;
+  }
+
+  let start=(AppState.inhousePage-1)*AppState.inhousePageSize;
+  let pageRows=rows.slice(start,start+AppState.inhousePageSize);
+
+  let variantFilterHtml='';
+
+  if(bm){
+    variantFilterHtml=
+    `<select id="modelF" onchange="AppState.filters.m=this.value;AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+      <option value="">All ${esc(bm)} Variants</option>
+      ${variantOptions.map(variantName=>
+        `<option value="${esc(variantName)}" ${String(variantName)===String(m)?'selected':''}>${esc(variantName)}</option>`
+      ).join('')}
+    </select>`;
+  }
+
+  el.innerHTML=
+  `<div class="panel">
+    <h2>In-House Inventory</h2>
+
+    <div class="notice">
+      Please filter the required information for your viewing
+    </div>
+
+    <div class="toolbar">
+
+      <select id="baseModelF" onchange="AppState.filters.bm=this.value;AppState.filters.m='';AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+        ${opt(baseModelOptions,bm,'Filter Base Model')}
+      </select>
+
+      ${variantFilterHtml}
+
+      <select id="ven" onchange="AppState.filters.v=this.value;AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+        ${opt(vendorOptions,v,'All vendors')}
+      </select>
+
+      <select id="lineF" onchange="AppState.filters.ln=this.value;AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+        ${opt(lineOptions,ln,'All lines')}
+      </select>
+
+      <select id="orderF" onchange="AppState.filters.ord=this.value;AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+        ${opt(orderOptions,ord,'Filter Order No')}
+      </select>
+
+      <select id="caseF" onchange="AppState.filters.cas=this.value;AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+        ${opt(caseOptions,cas,'Filter Case No')}
+      </select>
+
+      <select id="st" onchange="AppState.filters.st=this.value;AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+        <option value="">All status</option>
+        ${statusOptions.map(statusName=>
+          `<option value="${esc(statusName)}" ${String(statusName)===String(st)?'selected':''}>${esc(statusName)}</option>`
+        ).join('')}
+      </select>
+
+      <input id="q"
+        placeholder="Search model, order, case, colour..."
+        value="${esc(q)}"
+        oninput="AppState.filters.q=this.value;AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">
+
+      <button class="btn secondary" onclick="AppState.showAll=true;AppState.inhousePage=1;renderInhouse()">
+        Show All
+      </button>
+
+      <button class="btn secondary" onclick="resetInhouseView()">
+        Reset View
+      </button>
+
+      <button class="btn secondary" onclick="csvRows('inhouse-filtered.csv',getInhouseFiltered())">
+        Export Filtered CSV
+      </button>
+
+    </div>
+
+    ${summaryHtml}
+
+    ${
+      filteredActive
+      ?
+      t(pageRows,[
+        {k:'status',l:'Status',f:pill},
+        {k:'vendor',l:'Vendor'},
+        {k:'line',l:'Line'},
+        {k:'modelFull',l:'Model'},
+        {k:'endCode',l:'Sheet'},
+        {k:'orderNo',l:'Order No'},
+        {k:'colourCode',l:'Colour Code'},
+        {k:'caseNo',l:'Case No'},
+        {k:'lotNo',l:'Lot'},
+        {k:'caseSeq',l:'Case'},
+        {k:'dateReceive',l:'Actual Receive'},
+        {k:'expectedReceive',l:'Expected Receive'},
+        {k:'robFull',l:'R/F'},
+        {k:'dateUse',l:'Date Use'},
+        {k:'seq',l:'SEQ'},
+        {k:'sourceRow',l:'Excel Row'}
+      ],10000,'inhouse')
+      +
+      `<div class="toolbar">
+        <button class="btn secondary" onclick="goInhouseFirst()">First</button>
+        <button class="btn secondary" onclick="goInhousePage(-1)">Previous</button>
+        <span>Page ${AppState.inhousePage} of ${totalPages}</span>
+        <button class="btn secondary" onclick="goInhousePage(1)">Next</button>
+        <button class="btn secondary" onclick="goInhouseLast(${totalPages})">Last</button>
+      </div>
+      <p class="hint">
+        Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 5,000 rows.
+      </p>`
+      :
+      `<div class="empty">
+        <div>
+          <h2>Select a filter to list data</h2>
+          <p class="hint">Please filter the data needed</p>
+        </div>
+      </div>`
+    }
+
+  </div>`;
+}
+
+function getInhouseFiltered(){
+  let q   = AppState.filters.q || '';
+  let bm  = AppState.filters.bm || '';
+  let m   = AppState.filters.m || '';
+  let v   = AppState.filters.v || '';
+  let ln  = AppState.filters.ln || '';
+  let st  = AppState.filters.st || '';
+  let ord = AppState.filters.ord || '';
+  let cas = AppState.filters.cas || '';
+
+  let rows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+
+  if(bm){
+    rows=rows.filter(x=>getBaseModel(x.modelFull)===bm);
+  }
+
+  if(m){
+    rows=rows.filter(x=>x.modelFull===m);
+  }
+
+  if(v){
+    rows=rows.filter(x=>x.vendor===v);
+  }
+
+  if(ln){
+    rows=rows.filter(x=>x.line===ln);
+  }
+
+  if(ord){
+    rows=rows.filter(x=>x.orderNo===ord);
+  }
+
+  if(cas){
+    rows=rows.filter(x=>x.caseNo===cas);
+  }
+
+  if(st){
+    rows=rows.filter(x=>x.status===st);
+  }
+
+  return filter(rows,q);
+}
+
+// ==================== END IN-HOUSE FILTER FIX PATCH ====================
+
 function renderAll(){renderUpload();renderInhouse();renderKoike();renderToll();renderSettings()}
 renderAll();hideLoader();
 </script>
