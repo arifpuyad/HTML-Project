@@ -551,11 +551,107 @@ body.flow-app header{display:block}.layout{display:grid;grid-template-columns:25
     font-size: 9px !import*nt;
   }
 }
+
+
+/* ==========================================================
+   FINAL LOADER IMPLEMENTATION
+   Smaller moving bike, centered title, no ignition badge
+========================================================== */
+#loadingOverlay .loader-title:before{
+  content:none!important;
+  display:none!important;
+}
+
+#loadingOverlay .loader-title{
+  display:block!important;
+  width:100%!important;
+  text-align:center!important;
+  margin:0 auto 18px!important;
+  padding:0!important;
+  font-size:24px!important;
+  line-height:1.15!important;
+  letter-spacing:.10em!important;
+}
+
+#loadingOverlay .loader-card{
+  padding-top:34px!important;
+}
+
+#loadingOverlay .loader-bar:after{
+  content:""!important;
+  display:none!important;
+}
+
+.loader-zero,
+.loader-hundred{
+  position:absolute!important;
+  bottom:7px!important;
+  color:#9fb0c8!important;
+  font-size:10px!important;
+  font-weight:1000!important;
+  letter-spacing:.08em!important;
+  z-index:8!important;
+}
+
+.loader-zero{left:18px!important;}
+.loader-hundred{right:18px!important;}
+
+.loader-bike{
+  width:46px!important;
+  height:24px!important;
+  bottom:35px!important;
+  animation:bikeRide 2.8s infinite cubic-bezier(.2,.82,.18,1)!important;
+  will-change:transform!important;
+  filter:invert(1) brightness(1.35) drop-shadow(0 0 7px rgba(237,28,36,.82)) drop-shadow(0 4px 4px rgba(0,0,0,.5))!important;
+}
+
+.loader-bike img.loader-bike-img{
+  width:46px!important;
+  height:auto!important;
+}
+
+.loader-bike .exhaust{
+  left:-10px!important;
+  top:15px!important;
+  width:14px!important;
+  height:5px!important;
+  opacity:.75!important;
+}
+
+@keyframes bikeRide{
+  0%{transform:translateX(-60px) translateY(0) rotate(-1deg);}
+  12%{transform:translateX(3vw) translateY(-1px) rotate(0deg);}
+  48%{transform:translateX(41vw) translateY(1px) rotate(1deg);}
+  82%{transform:translateX(calc(min(720px,94vw) - 116px)) translateY(-1px) rotate(0deg);}
+  100%{transform:translateX(calc(min(720px,94vw) + 60px)) translateY(0) rotate(1deg);}
+}
+
+@media(max-width:640px){
+  #loadingOverlay .loader-title{
+    font-size:17px!important;
+    letter-spacing:.07em!important;
+  }
+  .loader-bike{
+    width:38px!important;
+    height:20px!important;
+    bottom:35px!important;
+    animation:bikeRide 2.8s infinite cubic-bezier(.2,.82,.18,1)!important;
+  }
+  .loader-bike img.loader-bike-img{width:38px!important;}
+  .loader-bike .exhaust{
+    left:-8px!important;
+    top:13px!important;
+    width:11px!important;
+  }
+  .loader-zero,
+  .loader-hundred{font-size:9px!important;}
+}
+
 </style>
 </head>
 <body>
 <div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
-<div id="loadingOverlay"><div class="loader-card"><div class="loader-title">Processing Inventory Data</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
+<div id="loadingOverlay"><div class="loader-card"><div class="loader-title">PROCESSING INVENTORY DATA</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
 <header><div class="top"><div class="brand-lockup"><img src="yamaha-title-logo.jpg" class="brand-logo-img" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
 <div class="layout">
 
@@ -2291,6 +2387,27 @@ hideLoader();
   };
 })();
 // ==================== END SPORTBIKE LOADER ENHANCEMENT V5 ====================
+
+
+
+// ==================== FINAL LOADER TITLE CLEANUP ====================
+(function(){
+  function finalLoaderTitleCleanup(){
+    var title=document.querySelector('#loadingOverlay .loader-title');
+    if(title){title.textContent='PROCESSING INVENTORY DATA';}
+  }
+
+  window.addEventListener('load',finalLoaderTitleCleanup);
+
+  if(typeof showLoader==='function'){
+    var previousShowLoaderFinal=showLoader;
+    showLoader=function(msg){
+      previousShowLoaderFinal(msg);
+      finalLoaderTitleCleanup();
+    };
+  }
+})();
+// ==================== END FINAL LOADER TITLE CLEANUP ====================
 
 </script>
 </body></html>
