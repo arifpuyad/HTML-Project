@@ -525,11 +525,47 @@ body.flow-app header{display:block}.layout{display:grid;grid-template-columns:25
 .loader-hundred{right:18px!important;}
 @media(max-width:640px){#loadingOverlay .loader-title{font-size:17px!important;letter-spacing:.07em!important}.loader-bike{left:calc(var(--loader-progress,0%) - 19px)!important;width:38px!important;height:20px!important;bottom:35px!important}.loader-bike img.loader-bike-img{width:38px!important}.loader-bike .exhaust{left:-8px!important;top:13px!important;width:11px!important}.loader-speed-label{font-size:9px!important;right:14px!important}.loader-zero,.loader-hundred{font-size:9px!important}}
 
+/* ==========================================================
+   IGNITION-FLASH SCREEN TRANSITION
+   Single orchestrated moment: iris wipe from click point,
+   red flash like a gauge cluster lighting up, then reveal.
+========================================================== */
+#flowTransition{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  pointer-events:none;
+  opacity:0;
+  background:
+    radial-gradient(circle at var(--ox,50%) var(--oy,50%),rgba(237,28,36,.55),rgba(237,28,36,.12) 38%,transparent 60%),
+    #05080c;
+  clip-path:circle(0% at var(--ox,50%) var(--oy,50%));
+  transition:clip-path .42s cubic-bezier(.65,0,.35,1),opacity .12s linear;
+  display:none;
+}
+#flowTransition.covering{
+  display:block;
+  opacity:1;
+  clip-path:circle(145% at var(--ox,50%) var(--oy,50%));
+}
+#flowTransition:before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:repeating-conic-gradient(from -140deg,rgba(255,255,255,.05) 0deg,rgba(255,255,255,.05) 2deg,transparent 2deg,transparent 8deg);
+  -webkit-mask:radial-gradient(circle at var(--ox,50%) var(--oy,50%),black 0,transparent 70%);
+  mask:radial-gradient(circle at var(--ox,50%) var(--oy,50%),black 0,transparent 70%);
+}
+@media(prefers-reduced-motion:reduce){
+  #flowTransition{transition:opacity .01s linear!important;clip-path:none!important}
+}
+
 </style>
 </head>
 <body>
 <div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
 <div id="loadingOverlay"><div class="loader-card"><div class="loader-title">PROCESSING INVENTORY DATA</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
+<div id="flowTransition" aria-hidden="true"></div>
 <header><div class="top"><div class="brand-lockup"><img src="yamaha-title-logo.jpg" class="brand-logo-img" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
 <div class="layout">
 
@@ -2162,16 +2198,48 @@ function updateStartCounts(){
   var c=(AppState.db&&AppState.db.lineCases?AppState.db.lineCases.length:0).toLocaleString();
   ['startCaseCount','liveCount'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=c;});
 }
-function openUploadBays(){
+function playScreenTransition(e,callback){
+  var overlay=document.getElementById('flowTransition');
+  var reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!overlay||reduced){callback();return;}
+  var ox='50%',oy='50%';
+  if(e&&typeof e.clientX==='number'&&window.innerWidth){
+    ox=(e.clientX/window.innerWidth*100).toFixed(1)+'%';
+    oy=(e.clientY/window.innerHeight*100).toFixed(1)+'%';
+  }
+  overlay.style.setProperty('--ox',ox);
+  overlay.style.setProperty('--oy',oy);
+  overlay.style.display='block';
+  void overlay.offsetWidth;
+  overlay.classList.add('covering');
+  setTimeout(function(){
+    callback();
+    setTimeout(function(){
+      overlay.classList.remove('covering');
+      setTimeout(function(){overlay.style.display='none';},450);
+    },40);
+  },420);
+}
+function swapToUploadBays(){
   setFlow('upload');
   show('upload');
   renderUpload();
   updateStartCounts();
 }
+function openUploadBays(e){
+  playScreenTransition(e,swapToUploadBays);
+}
+function backToSpeedometer(e){
+  playScreenTransition(e,function(){
+    setFlow('start');
+    renderUpload();
+    updateStartCounts();
+  });
+}
 if(document.addEventListener){
   document.addEventListener('click',function(e){
     var btn=e.target&&e.target.closest?e.target.closest('#startUploadBtn'):null;
-    if(btn){e.preventDefault();openUploadBays();}
+    if(btn){e.preventDefault();openUploadBays(e);}
   });
 }
 function fileListHtml(type){
@@ -2189,11 +2257,11 @@ function uploadBay(code,title,desc,type,clearText){
   return '<div class="upload-bay '+(has?'has-file':'')+'"><div class="bay-head"><div class="bay-code"><span>'+code+'</span><i class="bay-led"></i></div><b>'+title+'</b></div><div class="bay-body"><p class="hint">'+desc+'</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,\''+type+'\')'+reset+'">'+clear+'<div class="bay-file-list">'+fileListHtml(type)+'</div></div></div>';
 }
 function renderStartSpeedometer(){
-  document.getElementById('upload').innerHTML='<div class="flow-start-screen"><div class="start-console"><div class="start-title"><div class="eyebrow">WELCOME</div><h1>MML INVENTORY SYSTEM</h1><p>START INVENTORY LOADING SEQUENCE</p></div><div class="single-speedometer"><div class="outer-glow"></div><div class="inner-carbon"></div><div class="speed-track"><i></i></div><div class="speed-needle"></div><div class="mini-label">HONG LEONG YAMAHA MOTOR</div><div class="single-center"><div class="speed-logo-wrap"><img src="yamaha-title-logo.jpg" alt="Yamaha Logo" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'"><div class="speed-logo-fallback">YAMAHA</div></div><button id="startUploadBtn" type="button" onclick="openUploadBays();return false;">CLICK TO UPLOAD</button></div></div></div></div>';
+  document.getElementById('upload').innerHTML='<div class="flow-start-screen"><div class="start-console"><div class="start-title"><div class="eyebrow">WELCOME</div><h1>MML INVENTORY SYSTEM</h1><p>START INVENTORY LOADING SEQUENCE</p></div><div class="single-speedometer"><div class="outer-glow"></div><div class="inner-carbon"></div><div class="speed-track"><i></i></div><div class="speed-needle"></div><div class="mini-label">HONG LEONG YAMAHA MOTOR</div><div class="single-center"><div class="speed-logo-wrap"><img src="yamaha-title-logo.jpg" alt="Yamaha Logo" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'"><div class="speed-logo-fallback">YAMAHA</div></div><button id="startUploadBtn" type="button">CLICK TO UPLOAD</button></div></div></div></div>';
   updateStartCounts();
 }
 function renderUploadBays(){
-  document.getElementById('upload').innerHTML='<div class="flow-upload-screen"><div class="upload-console"><div class="upload-console-head"><div><h2>4 Upload Bays</h2><p>Upload the required files below. After files are uploaded, click Generate Inventory and the system will open the normal inventory layout.</p></div><div class="stage-pill">UPLOAD STAGE</div></div><div class="notice ok"><b>Required reports:</b> Toll Global, KOIKE, In-House Line 4, and Line 1,2,3. You may upload one by one or all at once depending on the file type.</div><div class="upload-bay-grid">'+uploadBay('DOCK A','Toll Global IN/OUT','Sheets: INBOUND and OUTBOUND.','toll','')+uploadBay('DOCK B','KOIKE Incoming','Visible monthly sheets only. Hidden sheets are skipped.','koike','')+uploadBay('DOCK C','In-House Line 4','Multiple upload is enabled for Line 4 files.','line','Clear Line 4 files')+uploadBay('DOCK D','In-House Line 1,2,3','Upload Instant Warehouse Record files. Vendor is detected from filename/header.','line123','Clear Line 1,2,3 files')+'</div><div class="upload-actions"><button class="btn green" onclick="generate()">Generate Inventory</button><button class="btn secondary" onclick="setFlow(\'start\');renderUpload()">Back to Speedometer</button><button class="btn danger" onclick="clearAll()">Clear</button><button class="btn secondary" onclick="exportJSON()">Export JSON</button></div><div id="log" class="hint"></div><noscript><div class="notice bad">JavaScript is blocked. Download the HTML and open locally in Microsoft Edge or Chrome.</div></noscript></div></div>';
+  document.getElementById('upload').innerHTML='<div class="flow-upload-screen"><div class="upload-console"><div class="upload-console-head"><div><h2>4 Upload Bays</h2><p>Upload the required files below. After files are uploaded, click Generate Inventory and the system will open the normal inventory layout.</p></div><div class="stage-pill">UPLOAD STAGE</div></div><div class="notice ok"><b>Required reports:</b> Toll Global, KOIKE, In-House Line 4, and Line 1,2,3. You may upload one by one or all at once depending on the file type.</div><div class="upload-bay-grid">'+uploadBay('DOCK A','Toll Global IN/OUT','Sheets: INBOUND and OUTBOUND.','toll','')+uploadBay('DOCK B','KOIKE Incoming','Visible monthly sheets only. Hidden sheets are skipped.','koike','')+uploadBay('DOCK C','In-House Line 4','Multiple upload is enabled for Line 4 files.','line','Clear Line 4 files')+uploadBay('DOCK D','In-House Line 1,2,3','Upload Instant Warehouse Record files. Vendor is detected from filename/header.','line123','Clear Line 1,2,3 files')+'</div><div class="upload-actions"><button class="btn green" onclick="generate()">Generate Inventory</button><button class="btn secondary" onclick="backToSpeedometer(event)">Back to Speedometer</button><button class="btn danger" onclick="clearAll()">Clear</button><button class="btn secondary" onclick="exportJSON()">Export JSON</button></div><div id="log" class="hint"></div><noscript><div class="notice bad">JavaScript is blocked. Download the HTML and open locally in Microsoft Edge or Chrome.</div></noscript></div></div>';
 }
 var originalRenderUpload=renderUpload;
 renderUpload=function(){
@@ -2224,9 +2292,11 @@ generate=async function(){
   setFlow('upload');
   await originalGenerate();
   if(hasData()){
-    setFlow('app');
-    renderAll();
-    show('inhouse');
+    playScreenTransition(null,function(){
+      setFlow('app');
+      renderAll();
+      show('inhouse');
+    });
   }else{
     setFlow('upload');
     renderUpload();
