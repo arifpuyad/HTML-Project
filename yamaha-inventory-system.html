@@ -554,104 +554,30 @@ body.flow-app header{display:block}.layout{display:grid;grid-template-columns:25
 
 
 /* ==========================================================
-   FINAL LOADER IMPLEMENTATION
-   Smaller moving bike, centered title, no ignition badge
+   FINAL PROGRESS-SYNC LOADER
+   Bike and fill bar follow the actual percentage count
 ========================================================== */
-#loadingOverlay .loader-title:before{
-  content:none!important;
-  display:none!important;
-}
-
-#loadingOverlay .loader-title{
-  display:block!important;
-  width:100%!important;
-  text-align:center!important;
-  margin:0 auto 18px!important;
-  padding:0!important;
-  font-size:24px!important;
-  line-height:1.15!important;
-  letter-spacing:.10em!important;
-}
-
-#loadingOverlay .loader-card{
-  padding-top:34px!important;
-}
-
-#loadingOverlay .loader-bar:after{
-  content:""!important;
-  display:none!important;
-}
-
-.loader-zero,
-.loader-hundred{
-  position:absolute!important;
-  bottom:7px!important;
-  color:#9fb0c8!important;
-  font-size:10px!important;
-  font-weight:1000!important;
-  letter-spacing:.08em!important;
-  z-index:8!important;
-}
-
+#loadingOverlay .loader-title:before{content:none!important;display:none!important;}
+#loadingOverlay .loader-title{display:block!important;width:100%!important;text-align:center!important;margin:0 auto 18px!important;padding:0!important;font-size:24px!important;line-height:1.15!important;letter-spacing:.10em!important;}
+#loadingOverlay .loader-card{padding-top:34px!important;}
+#loadingOverlay .loader-bar{--loader-progress:0%;position:relative!important;}
+#loadingOverlay .loader-bar:after{content:""!important;display:none!important;}
+#loadingOverlay .loader-fill{animation:none!important;clip-path:none!important;transform:none!important;width:var(--loader-progress,0%)!important;transition:width .38s cubic-bezier(.2,.82,.18,1)!important;border-radius:26px 0 0 26px!important;}
+.loader-bike{position:absolute!important;left:calc(var(--loader-progress,0%) - 23px)!important;width:46px!important;height:24px!important;bottom:35px!important;animation:none!important;transform:translateY(0) rotate(-1deg)!important;transition:left .38s cubic-bezier(.2,.82,.18,1),transform .38s ease!important;will-change:left,transform!important;filter:invert(1) brightness(1.35) drop-shadow(0 0 7px rgba(237,28,36,.82)) drop-shadow(0 4px 4px rgba(0,0,0,.5))!important;}
+.loader-bike img.loader-bike-img{display:block!important;width:46px!important;height:auto!important;object-fit:contain!important;position:absolute!important;left:0!important;bottom:0!important;z-index:6!important;}
+.loader-bike .exhaust{left:-10px!important;top:15px!important;width:14px!important;height:5px!important;opacity:.75!important;}
+.loader-speed-label:before{content:""!important;display:none!important;}
+.loader-speed-label{right:18px!important;top:12px!important;color:#e2e8f0!important;font-weight:1000!important;font-size:11px!important;letter-spacing:.10em!important;z-index:9!important;}
+.loader-zero,.loader-hundred{position:absolute!important;bottom:7px!important;color:#9fb0c8!important;font-size:10px!important;font-weight:1000!important;letter-spacing:.08em!important;z-index:8!important;}
 .loader-zero{left:18px!important;}
 .loader-hundred{right:18px!important;}
-
-.loader-bike{
-  width:46px!important;
-  height:24px!important;
-  bottom:35px!important;
-  animation:bikeRide 2.8s infinite cubic-bezier(.2,.82,.18,1)!important;
-  will-change:transform!important;
-  filter:invert(1) brightness(1.35) drop-shadow(0 0 7px rgba(237,28,36,.82)) drop-shadow(0 4px 4px rgba(0,0,0,.5))!important;
-}
-
-.loader-bike img.loader-bike-img{
-  width:46px!important;
-  height:auto!important;
-}
-
-.loader-bike .exhaust{
-  left:-10px!important;
-  top:15px!important;
-  width:14px!important;
-  height:5px!important;
-  opacity:.75!important;
-}
-
-@keyframes bikeRide{
-  0%{transform:translateX(-60px) translateY(0) rotate(-1deg);}
-  12%{transform:translateX(3vw) translateY(-1px) rotate(0deg);}
-  48%{transform:translateX(41vw) translateY(1px) rotate(1deg);}
-  82%{transform:translateX(calc(min(720px,94vw) - 116px)) translateY(-1px) rotate(0deg);}
-  100%{transform:translateX(calc(min(720px,94vw) + 60px)) translateY(0) rotate(1deg);}
-}
-
-@media(max-width:640px){
-  #loadingOverlay .loader-title{
-    font-size:17px!important;
-    letter-spacing:.07em!important;
-  }
-  .loader-bike{
-    width:38px!important;
-    height:20px!important;
-    bottom:35px!important;
-    animation:bikeRide 2.8s infinite cubic-bezier(.2,.82,.18,1)!important;
-  }
-  .loader-bike img.loader-bike-img{width:38px!important;}
-  .loader-bike .exhaust{
-    left:-8px!important;
-    top:13px!important;
-    width:11px!important;
-  }
-  .loader-zero,
-  .loader-hundred{font-size:9px!important;}
-}
+@media(max-width:640px){#loadingOverlay .loader-title{font-size:17px!important;letter-spacing:.07em!important}.loader-bike{left:calc(var(--loader-progress,0%) - 19px)!important;width:38px!important;height:20px!important;bottom:35px!important}.loader-bike img.loader-bike-img{width:38px!important}.loader-bike .exhaust{left:-8px!important;top:13px!important;width:11px!important}.loader-speed-label{font-size:9px!important;right:14px!important}.loader-zero,.loader-hundred{font-size:9px!important}}
 
 </style>
 </head>
 <body>
 <div id="successModal" class="successModal"><div class="successCard"><div class="successIcon">✓</div><h2>Inventory Generated Successfully</h2><div id="successInfo">Generation Complete</div><br><button class="successBtn" onclick="closeSuccessAndView()">View Inventory</button></div></div>
-<div id="loadingOverlay"><div class="loader-card"><div class="loader-title">PROCESSING INVENTORY DATA</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
+<div id="loadingOverlay"><div class="loader-card"><div class="loader-title">Processing Inventory Data</div><div class="loader-bar"><div class="loader-fill"></div></div><div class="loader-text">Loading records, applying filters, sorting data and preparing table view...</div></div></div>
 <header><div class="top"><div class="brand-lockup"><img src="yamaha-title-logo.jpg" class="brand-logo-img" alt="Yamaha Motor Logo"><div><h1>MML INVENTORY CONTROL TOWER</h1><div class="small">MML Inventory System</div></div></div><div class="badge" id="stamp">No generated data</div></div></header>
 <div class="layout">
 
@@ -847,6 +773,33 @@ document.getElementById('nav').addEventListener('click', function(e){
     show(btn.dataset.v);
 
 });function renderUpload(){let f=t=>AppState.files[t].map((x,i)=>(t==='line'||t==='line123')?`${esc(x.name)} <button class="btn secondary mini" onclick="removeLineFile('${t}',${i})">Remove</button>`:esc(x.name)).join('<br>')||'No file selected';document.getElementById('upload').innerHTML=`<div class="panel"><div style="display:flex;align-items:center;gap:14px;margin-bottom:16px"><img src="yamaha-badge.png" alt="Yamaha badge" style="width:44px;height:44px;display:block;border-radius:50%;border:1px solid #d8e0ea;background:#fff;object-fit:cover"><h2 style="margin:0">Upload & Generate Inventory</h2></div><div class="notice ok">Upload Excel Report from Line 4, Line 1,2,3 , KOIKE & Toll Global</div><div class="grid3"><div class="drop"><b>Toll Global IN/OUT</b><p class="hint">Sheets: INBOUND and OUTBOUND.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'toll')"><p class="hint">${f('toll')}</p></div><div class="drop"><b>Koike Incoming</b><p class="hint">Visible monthly sheets only. Hidden sheets are skipped.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'koike')"><p class="hint">${f('koike')}</p></div><div class="drop"><b>In-House Line 4</b><p class="hint">Multiple upload is enabled. Add Line 4 files such as YIMM, YMVN, TYM together or one by one.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'line');this.value=''"><div class="toolbar" style="margin:8px 0"><button class="btn secondary" onclick="clearType('line')">Clear Line 4 files</button></div><p class="hint"><b>Selected Line 4 files:</b><br>${f('line')}</p></div><div class="drop"><b>In-House Line 1,2,3</b><p class="hint">Upload Instant Warehouse Record files. Vendor is detected from filename/header: YIMM, VIETNAM/YMVN, TYM, INDIA/IYM, or CKD/YMC. These records appear as Line 1,2,3.</p><input type="file" multiple accept=".xlsx,.xls,.csv" onchange="setFiles(this.files,'line123');this.value=''"><div class="toolbar" style="margin:8px 0"><button class="btn secondary" onclick="clearType('line123')">Clear Line 1,2,3 files</button></div><p class="hint"><b>Selected Line 1,2,3 files:</b><br>${f('line123')}</p></div></div><div class="toolbar"><button class="btn green" onclick="generate()">Generate Inventory</button><button class="btn danger" onclick="clearAll()">Clear</button><button class="btn secondary" onclick="exportJSON()">Export JSON</button></div><div id="log" class="hint"></div><noscript><div class="notice bad">JavaScript is blocked. Download the HTML and open locally in Microsoft Edge or Chrome.</div></noscript></div>`}
+
+
+/**
+ * Repairs Line 4 marking numbers that combine Order No and Colour Code in one cell.
+ * Example: "BGEEB0 / A6-010A" -> Order No = BGEEB0, Colour Code = A6-010A.
+ */
+function repairLine4SlashOrderColour(){
+  if(!AppState || !AppState.db || !Array.isArray(AppState.db.lineCases))return;
+  AppState.db.lineCases.forEach(function(row){
+    if(!row || row.line !== 'Line 4')return;
+    var mark = clean(row.markingNo || row.modelName || '');
+    if(!mark || mark.indexOf('/') < 0)return;
+    var parts = mark.split('/').map(function(p){return clean(p).toUpperCase();}).filter(Boolean);
+    if(parts.length < 2)return;
+    var left = parts[0], right = parts[1];
+    var leftLooksOrder = /^[A-Z][A-Z0-9]{4,9}$/.test(left) && !/^[A-Z]{1,3}\d?\s*-\s*\d{3}[A-Z0-9]*$/.test(left);
+    var rightLooksColour = /^[A-Z0-9]{1,4}\s*-\s*\d{3}[A-Z0-9]*$/.test(right);
+    if(leftLooksOrder){
+      row.orderNo = left;
+      if(clean(row.modelName).toUpperCase() === mark.toUpperCase())row.modelName = '';
+    }
+    if(rightLooksColour){
+      row.colourCode = right.replace(/\s+/g,'');
+    }
+  });
+}
+
 async function generate(){
   showLoader("Generating inventory from uploaded files...");
   try{await ensureXLSX()}catch(e){document.getElementById('log').innerHTML='<div class="notice bad"><b>Excel parser not loaded:</b> '+e.message+'</div>';hideLoader();return}
@@ -866,6 +819,7 @@ async function generate(){
     }catch(e){msgs.push(`${file.name}: ERROR ${e.message}`)}
   }
   AppState.db.generatedAt=new Date().toLocaleString();
+  repairLine4SlashOrderColour();
 renderAll();
 
 if(document.getElementById('liveCount')){
@@ -2390,24 +2344,60 @@ hideLoader();
 
 
 
-// ==================== FINAL LOADER TITLE CLEANUP ====================
+// ==================== FINAL PROGRESS-SYNC LOADER ====================
 (function(){
-  function finalLoaderTitleCleanup(){
+  function clampPct(p){
+    p = Number(p);
+    if(!isFinite(p))p = 0;
+    return Math.max(0, Math.min(100, p));
+  }
+  function cleanLoaderTitle(){
     var title=document.querySelector('#loadingOverlay .loader-title');
-    if(title){title.textContent='PROCESSING INVENTORY DATA';}
+    if(title)title.textContent='PROCESSING INVENTORY DATA';
+  }
+  function syncLoaderToPercent(p,msg){
+    var pct = clampPct(p);
+    var overlay=document.getElementById('loadingOverlay');
+    if(!overlay)return;
+    var bar=overlay.querySelector('.loader-bar');
+    if(!bar)return;
+    bar.style.setProperty('--loader-progress', pct + '%');
+    var fill=bar.querySelector('.loader-fill');
+    if(fill){
+      fill.style.animation='none';
+      fill.style.clipPath='none';
+      fill.style.transform='none';
+      fill.style.width=pct + '%';
+    }
+    var bike=bar.querySelector('.loader-bike');
+    if(bike){
+      var half=Math.max(18, Math.round((bike.offsetWidth||46)/2));
+      bike.style.animation='none';
+      bike.style.left='calc(' + pct + '% - ' + half + 'px)';
+      bike.style.transform='translateY(0) rotate(' + (pct >= 100 ? '0' : '-1') + 'deg)';
+    }
+    var label=bar.querySelector('.loader-speed-label');
+    if(label)label.textContent='RACE ' + Math.round(pct) + '%';
+    var text=overlay.querySelector('.loader-text');
+    if(text && msg)text.textContent=msg + ' • ' + Math.round(pct) + '%';
+    cleanLoaderTitle();
   }
 
-  window.addEventListener('load',finalLoaderTitleCleanup);
+  var oldShowLoaderSync = showLoader;
+  showLoader = function(msg){
+    oldShowLoaderSync(msg);
+    setTimeout(function(){syncLoaderToPercent(0,msg||'Starting inventory generation');},0);
+  };
 
-  if(typeof showLoader==='function'){
-    var previousShowLoaderFinal=showLoader;
-    showLoader=function(msg){
-      previousShowLoaderFinal(msg);
-      finalLoaderTitleCleanup();
-    };
-  }
+  var oldUpdateGenProgressSync = updateGenProgress;
+  updateGenProgress = function(p,msg){
+    oldUpdateGenProgressSync(p,msg);
+    syncLoaderToPercent(p,msg);
+  };
+
+  window.syncLoaderToPercent = syncLoaderToPercent;
 })();
-// ==================== END FINAL LOADER TITLE CLEANUP ====================
+// ==================== END FINAL PROGRESS-SYNC LOADER ====================
 
 </script>
 </body></html>
