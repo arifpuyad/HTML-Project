@@ -218,6 +218,11 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function clean(x){return String(x??'').trim()}
 function num(x){return Number(String(x??'0').replace(/,/g,''))||0}
 function norm(x){return clean(x).toLowerCase().replace(/\s+/g,' ')}
+function getBaseModel(full){
+  if(!full)return '';
+  let part = String(full).split(/[-\s]/)[0];
+  return part.trim().toUpperCase();
+}
 function dval(x){return clean(x)}
 function fileKey(f){return [f.name,f.size,f.lastModified].join('|')}
 function ensureXLSX(){return new Promise(function(resolve,reject){if(window.XLSX){resolve();return}var log=document.getElementById('log');if(log){log.innerHTML='<div class="parser-loader"><div class="parser-pulse">Preparing Inventory Engine</div><div style="font-size:13px;color:#64748b">Loading Excel Processing Library (XLSX Parser)</div><div class="parser-bar"><div class="parser-fill"></div></div><div style="font-size:12px;color:#64748b;margin-top:8px">Please wait while the inventory engine initializes...</div></div>'}var sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';sc.onload=function(){resolve()};sc.onerror=function(){reject(new Error('Excel parser could not load. Download this HTML and open it locally in Edge/Chrome, then allow internet access for the parser.'))};document.head.appendChild(sc);});}
@@ -1009,10 +1014,15 @@ function opt(list,val,label){return `<option value="">${label}</option>`+list.ma
 function goInhouseFirst(){AppState.inhousePage=1;renderInhouse();}
 function goInhouseLast(totalPages){AppState.inhousePage=totalPages;renderInhouse();}
 function goInhousePage(dir){AppState.inhousePage=Math.max(1,AppState.inhousePage+dir);renderInhouse();}
+function getBaseModel(full){
+  if(!full)return '';
+  let part = String(full).split(/[-\s]/)[0];
+  return part.trim().toUpperCase();
+}
 function resetInhouseView(){
   AppState.showAll=false;
   AppState.inhousePage=1;
-  ['q','ven','lineF','st','modelF','orderF','caseF'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['q','ven','lineF','st','baseModelF','modelF','orderF','caseF'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   renderInhouse();
 }
 function renderInhouse(){
@@ -1023,11 +1033,13 @@ function renderInhouse(){
       v=el.querySelector('#ven')?.value||'',
       ln=el.querySelector('#lineF')?.value||'',
       st=el.querySelector('#st')?.value||'',
+      bm=el.querySelector('#baseModelF')?.value||'',
       m=el.querySelector('#modelF')?.value||'',
       ord=el.querySelector('#orderF')?.value||'',
       cas=el.querySelector('#caseF')?.value||'';
 
   function applySelected(rows,skip){
+    if(skip!=='baseModel'&&bm)rows=rows.filter(x=>getBaseModel(x.modelFull)===bm);
     if(skip!=='vendor'&&v)rows=rows.filter(x=>x.vendor===v);
     if(skip!=='line'&&ln)rows=rows.filter(x=>x.line===ln);
     if(skip!=='modelFull'&&m)rows=rows.filter(x=>x.modelFull===m);
@@ -1038,8 +1050,10 @@ function renderInhouse(){
   }
   function statusList(rows){let has=new Set(rows.map(x=>x.status).filter(Boolean));return ['In Stock','Used','Not Received'].filter(x=>has.has(x))}
   function normalizeFilters(){
-    for(let i=0;i<6;i++){
+    for(let i=0;i<7;i++){
       let changed=false;
+      let baseModels=unique(applySelected(baseRows,'baseModel').map(x=>getBaseModel(x.modelFull)),'');
+      if(bm&&!baseModels.includes(bm)){bm='';changed=true;}
       let models=unique(applySelected(baseRows,'modelFull'),'modelFull');if(m&&!models.includes(m)){m='';changed=true;}
       let vendors=unique(applySelected(baseRows,'vendor'),'vendor');if(v&&!vendors.includes(v)){v='';changed=true;}
       let lines=unique(applySelected(baseRows,'line'),'line');if(ln&&!lines.includes(ln)){ln='';changed=true;}
@@ -1051,7 +1065,8 @@ function renderInhouse(){
   }
   normalizeFilters();
 
-  let modelOptions=unique(applySelected(baseRows,'modelFull'),'modelFull');
+  let baseModelOptions=unique(applySelected(baseRows,'baseModel').map(x=>getBaseModel(x.modelFull)),'');
+  let modelOptions=bm?unique(applySelected(baseRows,'modelFull'),'modelFull'):[];
   let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
   let lineOptions=unique(applySelected(baseRows,'line'),'line');
   let orderOptions=unique(applySelected(baseRows,'orderNo'),'orderNo');
@@ -1060,14 +1075,17 @@ function renderInhouse(){
   let rows=filter(applySelected(baseRows,null),q);
   let summaryRows=filter(applySelected(baseRows,'status'),q);
 
-  let filteredActive=q||v||ln||st||m||ord||cas||AppState.showAll;
+  let filteredActive=q||v||ln||st||bm||m||ord||cas||AppState.showAll;
   let totalRows=rows.length;
   let summaryHtml=inhouseLotSummaryHTML(summaryRows);
   let start=(AppState.inhousePage-1)*AppState.inhousePageSize;
   let totalPages=Math.max(1,Math.ceil(totalRows/AppState.inhousePageSize));
   if(AppState.inhousePage>totalPages){AppState.inhousePage=1;start=0;}
   let pageRows=rows.slice(start,start+AppState.inhousePageSize);
-  el.innerHTML=`<div class="panel"><h2>In-House Inventory</h2><div class="notice">Please filter the require information for your viewing</div><div class="toolbar"><select id="modelF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(modelOptions,m,'Filter Model')}</select><select id="ven" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(vendorOptions,v,'All vendors')}</select><select id="lineF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(lineOptions,ln,'All lines')}</select><select id="orderF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(orderOptions,ord,'Filter Order No')}</select><select id="caseF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(caseOptions,cas,'Filter Case No')}</select><select id="st" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><input id="q" placeholder="Search model, order, case, colour..." value="${esc(q)}" oninput="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><button class="btn secondary" onclick="AppState.showAll=true;AppState.inhousePage=1;renderInhouse()">Show All</button><button class="btn secondary" onclick="resetInhouseView()">Reset View</button><button class="btn secondary" onclick="csvRows('inhouse-filtered.csv',getInhouseFiltered())">Export Filtered CSV</button></div>${summaryHtml}${filteredActive?(t(pageRows,[{k:'status',l:'Status',f:pill},{k:'vendor',l:'Vendor'},{k:'line',l:'Line'},{k:'modelFull',l:'Model'},{k:'endCode',l:'Sheet'},{k:'orderNo',l:'Order No'},{k:'colourCode',l:'Colour Code'},{k:'caseNo',l:'Case No'},{k:'lotNo',l:'Lot'},{k:'caseSeq',l:'Case'},{k:'dateReceive',l:'Actual Receive'},{k:'expectedReceive',l:'Expected Receive'},{k:'robFull',l:'R/F'},{k:'dateUse',l:'Date Use'},{k:'seq',l:'SEQ'},{k:'sourceRow',l:'Excel Row'}],10000,'inhouse')+`<div class='toolbar'><button class='btn secondary' onclick='goInhouseFirst()'>First</button><button class='btn secondary' onclick='goInhousePage(-1)'>Previous</button><span>Page ${AppState.inhousePage} of ${totalPages}</span><button class='btn secondary' onclick='goInhousePage(1)'>Next</button><button class='btn secondary' onclick='goInhouseLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 5,000 rows (updated for better performance).</p>`):'<div class="empty"><div><h2>Select a filter to list data</h2><p class="hint">Please filter the data needed</p></div></div>'}</div>`
+  
+  let variantFilterHtml = bm ? `<select id="modelF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(modelOptions,m,'Filter Variant/Model')}</select>` : '';
+
+  el.innerHTML=`<div class="panel"><h2>In-House Inventory</h2><div class="notice">Please filter the require information for your viewing</div><div class="toolbar"><select id="baseModelF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(baseModelOptions,bm,'Filter Base Model')}</select>${variantFilterHtml}<select id="ven" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(vendorOptions,v,'All vendors')}</select><select id="lineF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(lineOptions,ln,'All lines')}</select><select id="orderF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(orderOptions,ord,'Filter Order No')}</select><select id="caseF" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()">${opt(caseOptions,cas,'Filter Case No')}</select><select id="st" onchange="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><input id="q" placeholder="Search model, order, case, colour..." value="${esc(q)}" oninput="AppState.showAll=false;AppState.inhousePage=1;renderInhouse()"><button class="btn secondary" onclick="AppState.showAll=true;AppState.inhousePage=1;renderInhouse()">Show All</button><button class="btn secondary" onclick="resetInhouseView()">Reset View</button><button class="btn secondary" onclick="csvRows('inhouse-filtered.csv',getInhouseFiltered())">Export Filtered CSV</button></div>${summaryHtml}${filteredActive?(t(pageRows,[{k:'status',l:'Status',f:pill},{k:'vendor',l:'Vendor'},{k:'line',l:'Line'},{k:'modelFull',l:'Model'},{k:'endCode',l:'Sheet'},{k:'orderNo',l:'Order No'},{k:'colourCode',l:'Colour Code'},{k:'caseNo',l:'Case No'},{k:'lotNo',l:'Lot'},{k:'caseSeq',l:'Case'},{k:'dateReceive',l:'Actual Receive'},{k:'expectedReceive',l:'Expected Receive'},{k:'robFull',l:'R/F'},{k:'dateUse',l:'Date Use'},{k:'seq',l:'SEQ'},{k:'sourceRow',l:'Excel Row'}],10000,'inhouse')+`<div class='toolbar'><button class='btn secondary' onclick='goInhouseFirst()'>First</button><button class='btn secondary' onclick='goInhousePage(-1)'>Previous</button><span>Page ${AppState.inhousePage} of ${totalPages}</span><button class='btn secondary' onclick='goInhousePage(1)'>Next</button><button class='btn secondary' onclick='goInhouseLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 5,000 rows (updated for better performance).</p>`):'<div class="empty"><div><h2>Select a filter to list data</h2><p class="hint">Please filter the data needed</p></div></div>'}</div>`
 
 }
 function getInhouseFiltered(){
