@@ -432,13 +432,125 @@ body.flow-app header{display:block}.layout{display:grid;grid-template-columns:25
 @media(max-width:640px){.loader-bike{width:70px;transform:scale(.86)}#loadingOverlay .loader-bar{height:78px}.loader-speed-label{font-size:10px}.loader-bike .wheel{width:18px;height:18px}.loader-bike .bike-body{width:42px}}
 @media(prefers-reduced-motion:reduce){.loader-bike,#loadingOverlay .loader-fill,.loader-bike .wheel,.loader-bike .exhaust{animation:none!important}.loader-bike{left:50%;transform:translateX(-50%)}}
 
-
-/* ==========================================================
-   UPLOADED BIKE SILHOUETTE LOADER V7
-   Uses uploaded motorcycle graphic and improved 0% / 100% alignment
-========================================================== */
 #loadingOverlay .loader-bar:after{content:""!important;display:none!important}.loader-zero,.loader-hundred{position:absolute;bottom:7px;color:#9fb0c8;font-size:10px;font-weight:1000;letter-spacing:.08em;z-index:6}.loader-zero{left:18px}.loader-hundred{right:18px}.loader-bike{width:126px!important;height:54px!important;bottom:22px!important;filter:invert(1) brightness(1.25) drop-shadow(0 0 10px rgba(237,28,36,.88)) drop-shadow(0 7px 7px rgba(0,0,0,.55))!important}.loader-bike img.loader-bike-img{display:block;width:126px;height:auto;object-fit:contain;position:absolute;left:0;bottom:0;z-index:6}.loader-bike .bike-body,.loader-bike .bike-tail,.loader-bike .bike-front,.loader-bike .wheel{display:none!important}.loader-bike .exhaust{left:-24px!important;top:35px!important;width:34px!important;height:8px!important;background:linear-gradient(90deg,rgba(237,28,36,0),rgba(255,255,255,.92),rgba(237,28,36,.55))!important;filter:blur(.4px)}@keyframes bikeRide{0%{transform:translateX(-140px) translateY(0) rotate(-1deg)}12%{transform:translateX(3vw) translateY(-2px) rotate(0deg)}48%{transform:translateX(40vw) translateY(1px) rotate(1deg)}82%{transform:translateX(calc(min(720px,94vw) - 214px)) translateY(-2px) rotate(0deg)}100%{transform:translateX(calc(min(720px,94vw) + 135px)) translateY(0) rotate(1deg)}}@media(max-width:640px){.loader-bike{width:94px!important;height:42px!important}.loader-bike img.loader-bike-img{width:94px!important}.loader-zero,.loader-hundred{font-size:9px}}
+/* ==========================================================
+   FINAL LOADER OVERRIDE
+   Smaller bike, remove ignition label, center title
+========================================================== */
 
+/* Remove IGNITION RUNNING badge */
+#loadingOverlay .loader-title:before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Center PROCESSING INVENTORY DATA */
+#loadingOverlay .loader-title {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+  margin: 0 auto 18px !important;
+  padding: 0 !important;
+  font-size: 24px !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0.10em !important;
+}
+
+/* Give title proper spacing after removing badge */
+#loadingOverlay .loader-card {
+  padding-top: 34px !important;
+}
+
+/* Make bike much smaller */
+.loader-bike {
+  width: 48px !important;
+  height: 24px !important;
+  bottom: 35px !important;
+  filter:
+    invert(1)
+    brightness(1.35)
+    drop-shadow(0 0 7px rgba(237,28,36,.82))
+    drop-shadow(0 4px 4px rgba(0,0,0,.5)) !important;
+}
+
+.loader-bike img.loader-bike-img {
+  width: 48px !important;
+  height: auto !important;
+}
+
+/* Smaller exhaust */
+.loader-bike .exhaust {
+  left: -11px !important;
+  top: 15px !important;
+  width: 15px !important;
+  height: 5px !important;
+  opacity: .75 !important;
+}
+
+/* Keep 0% and 100% aligned */
+.loader-zero,
+.loader-hundred {
+  bottom: 7px !important;
+  font-size: 10px !important;
+  z-index: 8 !important;
+}
+
+.loader-zero {
+  left: 18px !important;
+}
+
+.loader-hundred {
+  right: 18px !important;
+}
+
+/* Smaller bike movement path */
+@keyframes bikeRide {
+  0% {
+   *transform: translateX(-62px) trans*ateY(0) rotate(-1deg);
+  }
+
+  12% *
+    transform: translateX(3vw) tr*nslateY(-1px) rotate(0deg);
+  }
+
+ *48% {
+    transform: translateX(41*w) translateY(1px) rotate(1deg);
+ *}
+
+  82% {
+    transform: translat*X(calc(min(720px, 94vw) - 118px)) *ranslateY(-1px) rotate(0deg);
+  }
+*  100% {
+    transform: translateX*calc(min(720px, 94vw) + 62px)) translateY(0) rotate(1deg);
+  }
+}
+
+/* Mobile size */
+@media(max-width:640px) {
+  #loa*ingOverlay .loader-title {
+    fon*-size: 17px !important;
+    letter*spacing: .07em !important;
+  }
+
+  *loader-bike {
+    width: 40px !imp*rtant;
+    height: 20px !important*
+    bottom: 35px !important;
+  }
+*  .loader-bike img.loader-bike-img*{
+    width: 40px !important;
+  }
+*  .loader-bike .exhaust {
+    left* -9px !important;
+    top: 13px !i*portant;
+    width: 12px !importan*;
+  }
+
+  .loader-zero,
+  .loader-h*ndred {
+    font-size: 9px !import*nt;
+  }
+}
 </style>
 </head>
 <body>
