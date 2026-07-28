@@ -221,14 +221,15 @@ function getBaseModel(full){
 
   let txt=String(full).trim().toUpperCase();
 
-  // Smart base model grouping:
-  // D5G1 -> D5G1
-  // D5G1 A3 010A -> D5G1
-  // D5G1-010A -> D5G1
-  // D5G1-010B -> D5G1
-  // BNT1A8-010A -> BNT1A8
   let firstPart=txt.split(/\s+/)[0];
   firstPart=firstPart.split('-')[0];
+
+  // Convert BFA4, BFA5, BFA6 -> BFA
+  let match=firstPart.match(/^([A-Z]+)\d$/);
+
+  if(match){
+    return match[1];
+  }
 
   return firstPart.trim();
 }
