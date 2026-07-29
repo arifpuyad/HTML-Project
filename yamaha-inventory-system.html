@@ -593,6 +593,7 @@ const SAFETY_BACKUP_KEY='yamaha-inventory-latest-backup';
  * @returns {Object} Empty database with containers, movements, lineCases arrays
  */
 function emptyDB(){return{containers:[],movements:[],lineCases:[],sources:[],generatedAt:null}}
+function isInhouseRow(x){return !x.warehouse}
 AppState.db=emptyDB();
 /**
  * Shows the success modal with generation summary
@@ -812,7 +813,7 @@ renderAll();
 
 if(document.getElementById('liveCount')){
     document.getElementById('liveCount').innerText =
-        AppState.db.lineCases.length.toLocaleString();
+        AppState.db.lineCases.filter(isInhouseRow).length.toLocaleString();
 }
 
 hideLoader();
@@ -1564,7 +1565,7 @@ if(type==='line123'){
   }
 }
 return o}
-function summary(){let lc=AppState.db.lineCases,used=lc.filter(x=>x.status==='Used').length,stock=lc.filter(x=>x.status==='In Stock').length,nr=lc.filter(x=>x.status==='Not Received').length;return{containers:AppState.db.containers.length,movements:AppState.db.movements.length,lineCases:lc.length,used,stock,nr,vendors:new Set(lc.map(x=>x.vendor)).size,models:new Set(lc.map(x=>x.modelFull)).size}}
+function summary(){let lc=AppState.db.lineCases.filter(isInhouseRow),used=lc.filter(x=>x.status==='Used').length,stock=lc.filter(x=>x.status==='In Stock').length,nr=lc.filter(x=>x.status==='Not Received').length;return{containers:AppState.db.containers.length,movements:AppState.db.movements.length,lineCases:lc.length,used,stock,nr,vendors:new Set(lc.map(x=>x.vendor)).size,models:new Set(lc.map(x=>x.modelFull)).size}}
 function renderDash(){let el=document.getElementById('dash');if(!hasData()){el.innerHTML=noData('Dashboard empty until generated');document.getElementById('stamp').textContent='No generated data';return}let s=summary();document.getElementById('stamp').textContent=`Generated ${AppState.db.generatedAt} | ${fmt(s.lineCases)} in-house cases`;el.innerHTML=`<div class="kpis"><div class="kpi"><div class="label">In-house cases</div><div class="value">${fmt(s.lineCases)}</div></div><div class="kpi"><div class="label">In stock</div><div class="value">${fmt(s.stock)}</div></div><div class="kpi"><div class="label">Used</div><div class="value">${fmt(s.used)}</div></div><div class="kpi"><div class="label">Not received</div><div class="value">${fmt(s.nr)}</div></div><div class="kpi"><div class="label">Vendors</div><div class="value">${fmt(s.vendors)}</div></div><div class="kpi"><div class="label">Models</div><div class="value">${fmt(s.models)}</div></div></div><div class="panel"><h2>Generated Sources</h2><ul>${AppState.db.sources.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`}
 function sortValue(v){return String(v??'').toLowerCase()}
 function applySort(rows,id){let st=AppState.sort[id];if(!st||!st.k)return rows;let copy=[...rows];copy.sort((a,b)=>{let av=a[st.k],bv=b[st.k];let an=Number(String(av).replace(/,/g,'')),bn=Number(String(bv).replace(/,/g,''));let cmp=(!isNaN(an)&&!isNaN(bn)&&String(av).trim()!==''&&String(bv).trim()!=='')?an-bn:sortValue(av).localeCompare(sortValue(bv),undefined,{numeric:true});return st.dir==='desc'?-cmp:cmp});return copy}
@@ -1644,7 +1645,7 @@ function resetInhouseView(){
 function renderInhouse(){
   let el=document.getElementById('inhouse');
   if(!hasData()){el.innerHTML=noData('In-house cases empty until generated');return}
-  let baseRows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let baseRows=collapseInhouseRows(AppState.db.lineCases.filter(isInhouseRow).map(normalizeInhouseDisplayRow));
   let q=el.querySelector('#q')?.value||'',
       v=el.querySelector('#ven')?.value||'',
       ln=el.querySelector('#lineF')?.value||'',
@@ -1749,7 +1750,7 @@ function getInhouseFiltered(){
       m=document.getElementById('modelF')?.value||'',
       ord=document.getElementById('orderF')?.value||'',
       cas=document.getElementById('caseF')?.value||'';
-  let rows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let rows=collapseInhouseRows(AppState.db.lineCases.filter(isInhouseRow).map(normalizeInhouseDisplayRow));
   if(v)rows=rows.filter(x=>x.vendor===v);
   if(ln)rows=rows.filter(x=>x.line===ln);
   if(m)rows=rows.filter(x=>x.modelFull===m);
@@ -2010,7 +2011,7 @@ function renderInhouse(){
     return;
   }
 
-  let baseRows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let baseRows=collapseInhouseRows(AppState.db.lineCases.filter(isInhouseRow).map(normalizeInhouseDisplayRow));
 
   let q   = AppState.filters.q || '';
   let bm  = AppState.filters.bm || '';
@@ -2289,7 +2290,7 @@ function getInhouseFiltered(){
   let ord = AppState.filters.ord || '';
   let cas = AppState.filters.cas || '';
 
-  let rows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let rows=collapseInhouseRows(AppState.db.lineCases.filter(isInhouseRow).map(normalizeInhouseDisplayRow));
 
   if(bm){
     rows=rows.filter(x=>getBaseModel(x.modelFull)===bm);
@@ -2333,7 +2334,7 @@ function renderAll(){
 
     if(document.getElementById('liveCount')){
         document.getElementById('liveCount').innerText =
-            AppState.db.lineCases.length.toLocaleString();
+            AppState.db.lineCases.filter(isInhouseRow).length.toLocaleString();
     }
 }
 
@@ -2346,7 +2347,7 @@ function setFlow(mode){
   document.body.classList.add('flow-'+mode);
 }
 function updateStartCounts(){
-  var c=(AppState.db&&AppState.db.lineCases?AppState.db.lineCases.length:0).toLocaleString();
+  var c=(AppState.db&&AppState.db.lineCases?AppState.db.lineCases.filter(isInhouseRow).length:0).toLocaleString();
   ['startCaseCount','liveCount'].forEach(function(id){var el=document.getElementById(id);if(el)el.textContent=c;});
 }
 function playScreenTransition(e,callback){
