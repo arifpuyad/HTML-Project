@@ -641,6 +641,8 @@ window.addEventListener('error',function(e){var log=document.getElementById('log
  * @returns {boolean} True if database contains data
  */
 function hasData(){return AppState.db.containers.length+AppState.db.movements.length+AppState.db.lineCases.length>0}
+// KOIKE detail cases share the import store, but are not In-House inventory.
+function inhouseCaseRows(){return AppState.db.lineCases.filter(function(row){return row.warehouse!=='Koike';});}
 function fmt(n){return Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2})}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function clean(x){return String(x??'').trim()}
@@ -983,6 +985,8 @@ function vendorFromInstant(name,rows){
 }
 function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[],lineCases:[]};if(type==='toll'){let h=findHeader(rows,['Container']);let head=rows[h].map(norm);let c=idx(head,['container']);if(c<0)c=2;let inbound=sheet.toLowerCase().includes('inbound')||idx(head,['no. of box'])>=0;if(inbound){for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;o.containers.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,containerNo:clean(r[c]).toUpperCase(),dateArrive:dval(r[idx(head,['date arrive'])]),dateReceive:dval(r[idx(head,['date receive'])]),origin:clean(r[idx(head,['origin'])]),m3:num(r[idx(head,['m3'])]),boxQty:num(r[idx(head,['no. of box'])]),palletQty:0})}}else{for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;let b=num(r[idx(head,['balance'])]);o.movements.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,date:dval(r[idx(head,['date offloading'])])||dval(r[idx(head,['date arrive'])]),containerNo:clean(r[c]).toUpperCase(),invoiceNo:clean(r[idx(head,['invoice no'])]),caseMarkOrderNo:clean(r[idx(head,['case mark order no'])]),model:clean(r[idx(head,['modal'])]),caseIn:clean(r[idx(head,['case in'])]),caseOut:clean(r[idx(head,['case out'])]),balance:b,location:clean(r[idx(head,['location'])]),status:b>0?'Open':'Closed'})}}}
 if(type==='koike'){
+  // Placeholder values are not real model or set-code values and must not enter filters.
+  function isKoikePlaceholderCode(value){return /^(?:9999|999999)$/.test(clean(value));}
   // ================================================================
   // KOIKE "STOCK COUNT SHEET" SMART LOT/CASE EXPANSION
   // ----------------------------------------------------------------
@@ -1103,10 +1107,14 @@ if(type==='koike'){
       let lotRaw=cLotSC>=0?r[cLotSC]:'';
       let caseRaw=cCaseSC>=0?r[cCaseSC]:'';
       if(!markNo && !clean(lotRaw) && !clean(caseRaw))continue; // blank section-separator row
-      let modelVal=clean(cModel>=0?r[cModel]:'')||sheet;
+      let rawModelVal=clean(cModel>=0?r[cModel]:'');
+      let rawSetCodeVal=clean(cSetCode>=0?r[cSetCode]:'');
+      let modelIsPlaceholder=isKoikePlaceholderCode(rawModelVal);
+      let setCodeIsPlaceholder=isKoikePlaceholderCode(rawSetCodeVal);
+      let modelVal=modelIsPlaceholder?'':(rawModelVal||sheet);
       let vendorVal=clean(cCountry>=0?r[cCountry]:'')||scMeta.vendor;
       let locationVal=clean(cLoc>=0?r[cLoc]:'');
-      let setCodeVal=clean(cSetCode>=0?r[cSetCode]:'');
+      let setCodeVal=setCodeIsPlaceholder?'':rawSetCodeVal;
       let colourVal=clean(cColour>=0?r[cColour]:'');
       let facVal=clean(cFac>=0?r[cFac]:'');
       let recRaw=cReceive>=0?dval(r[cReceive]):'';
@@ -1127,7 +1135,7 @@ if(type==='koike'){
         o.lineCases.push({
           warehouse:'Koike',warehouseLocation:locationVal,vendor:vendorVal,line:scMeta.line,
           sourceFile,sourceSheet:sheet,sourceRow:i+1,
-          endCode:setCodeVal||sheet,modelFull:modelVal,modelName:modelVal,factory:facVal,
+          endCode:setCodeIsPlaceholder?'':(setCodeVal||sheet),modelFull:modelVal,modelName:modelVal,factory:facVal,
           colourCode:colourVal,orderNo:'',setQty:'',
           markingNo:markNo,caseNo:caseNoFull,lotNo:lotPadded,caseSeq:caseSeq,
           dateReceive:dr,receiveYear:recYear,expectedReceive:'',robFull:'',
@@ -1401,16 +1409,18 @@ if(type==='koike'){
       let colourNow=clean(r[cColour]);
       let markNow=clean(r[cMark]);
       let vendorData=(!headerLikeKoike(vendorNow))?vendorNow:'';
-      let modelData=(!headerLikeKoike(modelNow))?modelNow:'';
+      let modelIsPlaceholder=isKoikePlaceholderCode(modelNow);
+      let setCodeIsPlaceholder=isKoikePlaceholderCode(setNow);
+      let modelData=(!headerLikeKoike(modelNow)&&!modelIsPlaceholder)?modelNow:'';
       let factoryData=(!headerLikeKoike(factoryNow))?factoryNow:'';
-      let setData=(!headerLikeKoike(setNow))?setNow:'';
+      let setData=(!headerLikeKoike(setNow)&&!setCodeIsPlaceholder)?setNow:'';
       let colourData=(!headerLikeKoike(colourNow))?colourNow:'';
       let markData=(!headerLikeKoike(markNow))?markNow:'';
       if(locNow)ctx.warehouseLocation=locNow;
       if(vendorData)ctx.vendor=vendorData;
-      if(modelData)ctx.model=modelData;
+      if(modelIsPlaceholder)ctx.model=''; else if(modelData)ctx.model=modelData;
       if(factoryData)ctx.factory=factoryData;
-      if(setData)ctx.setCode=setData;
+      if(setCodeIsPlaceholder)ctx.setCode=''; else if(setData)ctx.setCode=setData;
       if(colourData)ctx.colourCode=colourData;
       if(markData)ctx.markNo=markData;
       let caseNo=caseNormKoike(r[cCase]);
@@ -1433,8 +1443,10 @@ if(type==='koike'){
           warehouseLocation:locNow||ctx.warehouseLocation,
           vendor:vendorData||ctx.vendor,
           model:modelData||ctx.model,
+          modelIsPlaceholder:modelIsPlaceholder,
           factory:factoryData||ctx.factory,
           setCode:setData||ctx.setCode,
+          setCodeIsPlaceholder:setCodeIsPlaceholder,
           colourCode:colourData||ctx.colourCode
         });
       }
@@ -1477,7 +1489,7 @@ if(type==='koike'){
       let st=du?'Used':(dr?'In Stock':'Not Received');
       let seq=clean(r[cSeq]);
       let remarks=[headCase[cSeq]&&headCase[cSeq].includes('remark')?seq:'',markNote].filter(Boolean).join(' | ');
-      o.lineCases.push({warehouse:'Koike',warehouseLocation:item.warehouseLocation||'',vendor:item.vendor||meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:item.setCode||sheet,modelFull:item.model||sheetModel,modelName:item.model||sheetModel,factory:item.factory||'',colourCode:item.colourCode||currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:lotPart,blockCaseFrom:seqPart,blockCaseTo:seqPart,blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:clean(r[cMark])||item.mark||currentMark,caseNo:caseDisplay,lotNo:lotPart,caseSeq:seqPart,dateReceive:dr,receiveYear:recYear,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,sendToHlym:du,sendYear:sendYear,seq,status:st})
+      o.lineCases.push({warehouse:'Koike',warehouseLocation:item.warehouseLocation||'',vendor:item.vendor||meta.vendor,line:meta.line,sourceFile,sourceSheet:sheet,endCode:item.setCodeIsPlaceholder?'':(item.setCode||sheet),modelFull:item.modelIsPlaceholder?'':(item.model||sheetModel),modelName:item.modelIsPlaceholder?'':(item.model||sheetModel),factory:item.factory||'',colourCode:item.colourCode||currentColour,orderNo:currentMark,setQty:'',blockNo,blockStartRow,sourceRow:i+1,blockLotNo:lotPart,blockCaseFrom:seqPart,blockCaseTo:seqPart,blockCaseCount:1,blockPullInDate:dr,remarks,markingNo:clean(r[cMark])||item.mark||currentMark,caseNo:caseDisplay,lotNo:lotPart,caseSeq:seqPart,dateReceive:dr,receiveYear:recYear,expectedReceive:'',robFull:clean(r[cRob]),dateUse:du,sendToHlym:du,sendYear:sendYear,seq,status:st})
     }
   }else{
     let h=findHeader(rows,['Container Number']);
@@ -1645,7 +1657,7 @@ if(type==='line123'){
   }
 }
 return o}
-function summary(){let lc=AppState.db.lineCases,used=lc.filter(x=>x.status==='Used').length,stock=lc.filter(x=>x.status==='In Stock').length,nr=lc.filter(x=>x.status==='Not Received').length;return{containers:AppState.db.containers.length,movements:AppState.db.movements.length,lineCases:lc.length,used,stock,nr,vendors:new Set(lc.map(x=>x.vendor)).size,models:new Set(lc.map(x=>x.modelFull)).size}}
+function summary(){let lc=inhouseCaseRows(),used=lc.filter(x=>x.status==='Used').length,stock=lc.filter(x=>x.status==='In Stock').length,nr=lc.filter(x=>x.status==='Not Received').length;return{containers:AppState.db.containers.length,movements:AppState.db.movements.length,lineCases:lc.length,used,stock,nr,vendors:new Set(lc.map(x=>x.vendor)).size,models:new Set(lc.map(x=>x.modelFull)).size}}
 function renderDash(){let el=document.getElementById('dash');if(!hasData()){el.innerHTML=noData('Dashboard empty until generated');document.getElementById('stamp').textContent='No generated data';return}let s=summary();document.getElementById('stamp').textContent=`Generated ${AppState.db.generatedAt} | ${fmt(s.lineCases)} in-house cases`;el.innerHTML=`<div class="kpis"><div class="kpi"><div class="label">In-house cases</div><div class="value">${fmt(s.lineCases)}</div></div><div class="kpi"><div class="label">In stock</div><div class="value">${fmt(s.stock)}</div></div><div class="kpi"><div class="label">Used</div><div class="value">${fmt(s.used)}</div></div><div class="kpi"><div class="label">Not received</div><div class="value">${fmt(s.nr)}</div></div><div class="kpi"><div class="label">Vendors</div><div class="value">${fmt(s.vendors)}</div></div><div class="kpi"><div class="label">Models</div><div class="value">${fmt(s.models)}</div></div></div><div class="panel"><h2>Generated Sources</h2><ul>${AppState.db.sources.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`}
 function sortValue(v){return String(v??'').toLowerCase()}
 function applySort(rows,id){let st=AppState.sort[id];if(!st||!st.k)return rows;let copy=[...rows];copy.sort((a,b)=>{let av=a[st.k],bv=b[st.k];let an=Number(String(av).replace(/,/g,'')),bn=Number(String(bv).replace(/,/g,''));let cmp=(!isNaN(an)&&!isNaN(bn)&&String(av).trim()!==''&&String(bv).trim()!=='')?an-bn:sortValue(av).localeCompare(sortValue(bv),undefined,{numeric:true});return st.dir==='desc'?-cmp:cmp});return copy}
@@ -1666,6 +1678,77 @@ function statusSummaryHTML(rows,statusKey){
   let stock=rows.filter(function(x){return clean(x[statusKey])==='In Stock';}).length;
   let used=rows.filter(function(x){return clean(x[statusKey])==='Used';}).length;
   return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">Lot In Stock</div><div class="value">${fmt(stock)}</div></div><div class="kpi"><div class="label">Lot Used</div><div class="value">${fmt(used)}</div></div></div>`;
+}
+// Known KOIKE packing standards. Add a model here when its standard is fixed.
+const KOIKE_LOT_CASE_STANDARDS={BDLA:6};
+function koikeLotSummaryHTML(rows,standardRows){
+  function collectLots(sourceRows){
+    let grouped={};
+    sourceRows.forEach(function(r,index){
+      let model=clean(r.model);
+      let lot=clean(r.lotNumber);
+      if(!model||!lot)return;
+      let vendor=clean(r.vendor).toUpperCase();
+      let orderNo=clean(r.orderNo||r.markNo).toUpperCase();
+      let setCode=clean(r.setCode).toUpperCase();
+      let colourCode=clean(r.colourCode).toUpperCase();
+      // Packing standards can vary by set and colour within the same model.
+      let standardKey=[vendor,model.toUpperCase(),setCode,colourCode].join('|');
+      // A reused lot/case number is only the same physical lot when its vendor,
+      // order, set code and colour code also match.
+      let key=[standardKey,orderNo,lot.toUpperCase()].join('|');
+      if(!grouped[key])grouped[key]={model:model,standardKey:standardKey,cases:new Map()};
+      // The parser's case sequence is normalized (for example 001–006), while
+      // the displayed case number may preserve the spreadsheet's mixed format.
+      let caseId=clean(r.caseSequence)||clean(r.caseNumber);
+      // A case number is expected for KOIKE detail rows. Keep an empty value distinct
+      // rather than accidentally merging several unnumbered rows into one case.
+      if(!caseId)caseId='__row_'+index;
+      let previous=grouped[key].cases.get(caseId);
+      let status=clean(r.inventoryStatus);
+      // Used wins if duplicate records disagree, preventing a pulled case from being
+      // counted as still available.
+      if(!previous||status==='Used')grouped[key].cases.set(caseId,status);
+    });
+    return grouped;
+  }
+  let lots=collectLots(rows);
+  let standardLots=collectLots(standardRows&&standardRows.length?standardRows:rows);
+  let modelCaseCounts={};
+  Object.keys(standardLots).forEach(function(key){
+    let lot=standardLots[key],count=lot.cases.size;
+    if(!modelCaseCounts[lot.standardKey])modelCaseCounts[lot.standardKey]={};
+    modelCaseCounts[lot.standardKey][count]=(modelCaseCounts[lot.standardKey][count]||0)+1;
+  });
+  function standardCaseCount(lot){
+    let configured=KOIKE_LOT_CASE_STANDARDS[clean(lot.model).toUpperCase()];
+    if(configured)return configured;
+    let counts=modelCaseCounts[lot.standardKey]||{},standard=0,frequency=-1;
+    Object.keys(counts).forEach(function(count){
+      let number=Number(count),seen=counts[count];
+      // Prefer the smaller count on a tie: duplicated / differently formatted
+      // source entries can inflate a lot, but cannot create missing cases.
+      if(seen>frequency||(seen===frequency&&(standard===0||number<standard))){
+        standard=number;frequency=seen;
+      }
+    });
+    return standard;
+  }
+  let lotInStock=0,freezeLot=0;
+  Object.keys(lots).forEach(function(key){
+    let lot=lots[key],stockCases=0,usedCases=0;
+    lot.cases.forEach(function(status){
+      if(status==='In Stock')stockCases++;
+      if(status==='Used')usedCases++;
+    });
+    if(!stockCases)return;
+    let standard=standardCaseCount(lot);
+    // An incomplete lot, or a lot where any case has already been used, must stay
+    // visible as Freeze Lot instead of being counted as available stock.
+    if(stockCases<standard||usedCases>0)freezeLot++;
+    else lotInStock++;
+  });
+  return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">Lot in Stock</div><div class="value">${fmt(lotInStock)}</div></div><div class="kpi"><div class="label">Freeze Lot</div><div class="value">${fmt(freezeLot)}</div></div></div>`;
 }
 function inhouseLotSummaryHTML(rows){
   let lots={};
@@ -1725,7 +1808,7 @@ function resetInhouseView(){
 function renderInhouse(){
   let el=document.getElementById('inhouse');
   if(!hasData()){el.innerHTML=noData('In-house cases empty until generated');return}
-  let baseRows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let baseRows=collapseInhouseRows(inhouseCaseRows().map(normalizeInhouseDisplayRow));
   let q=el.querySelector('#q')?.value||'',
       v=el.querySelector('#ven')?.value||'',
       ln=el.querySelector('#lineF')?.value||'',
@@ -1830,7 +1913,7 @@ function getInhouseFiltered(){
       m=document.getElementById('modelF')?.value||'',
       ord=document.getElementById('orderF')?.value||'',
       cas=document.getElementById('caseF')?.value||'';
-  let rows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let rows=collapseInhouseRows(inhouseCaseRows().map(normalizeInhouseDisplayRow));
   if(v)rows=rows.filter(x=>x.vendor===v);
   if(ln)rows=rows.filter(x=>x.line===ln);
   if(m)rows=rows.filter(x=>x.modelFull===m);
@@ -1839,8 +1922,8 @@ function getInhouseFiltered(){
   if(st)rows=rows.filter(x=>x.status===st);
   return filter(rows,q)
 }
-function orderBlockRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.sourceSheet,x.orderNo,x.blockNo,x.blockStartRow].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,modelName:x.modelName,colourCode:x.colourCode,blockNo:x.blockNo,blockStartRow:x.blockStartRow,lotNo:x.blockLotNo,caseFrom:x.blockCaseFrom,caseTo:x.blockCaseTo,total:0,received:0,used:0,stock:0,notReceived:0,pullInDate:x.blockPullInDate,remarks:x.remarks};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
-function lotRows(){let g={};AppState.db.lineCases.forEach(x=>{let k=[x.vendor,x.line,x.modelFull,x.endCode,x.orderNo,x.colourCode,x.lotNo].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,colourCode:x.colourCode,lotNo:x.lotNo,total:0,received:0,used:0,stock:0,notReceived:0};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
+function orderBlockRows(){let g={};inhouseCaseRows().forEach(x=>{let k=[x.vendor,x.line,x.sourceSheet,x.orderNo,x.blockNo,x.blockStartRow].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,modelName:x.modelName,colourCode:x.colourCode,blockNo:x.blockNo,blockStartRow:x.blockStartRow,lotNo:x.blockLotNo,caseFrom:x.blockCaseFrom,caseTo:x.blockCaseTo,total:0,received:0,used:0,stock:0,notReceived:0,pullInDate:x.blockPullInDate,remarks:x.remarks};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
+function lotRows(){let g={};inhouseCaseRows().forEach(x=>{let k=[x.vendor,x.line,x.modelFull,x.endCode,x.orderNo,x.colourCode,x.lotNo].join('|');if(!g[k])g[k]={vendor:x.vendor,line:x.line,modelFull:x.modelFull,endCode:x.endCode,orderNo:x.orderNo,colourCode:x.colourCode,lotNo:x.lotNo,total:0,received:0,used:0,stock:0,notReceived:0};g[k].total++;if(x.dateReceive)g[k].received++;if(x.status==='Used')g[k].used++;if(x.status==='In Stock')g[k].stock++;if(x.status==='Not Received')g[k].notReceived++});return Object.values(g)}
 function koikeStatus(row){return clean(row.pullOutDate)?'Used':'In Stock'}
 function koikeCaseStatus(row){return clean(row.sendToHlym||row.dateUse)?'Used':(clean(row.dateReceive)?'In Stock':'Not Received')}
 function tollStatusMap(){
@@ -1866,12 +1949,14 @@ function koikeViewRows(){
         warehouseLocation:clean(x.warehouseLocation),
         vendor:clean(x.vendor),
         markNo:clean(x.markingNo),
+        orderNo:clean(x.orderNo||x.markingNo),
         model:clean(x.modelFull||x.modelName),
         factory:clean(x.factory),
         setCode:clean(x.endCode),
         colourCode:clean(x.colourCode),
         lotNumber:clean(x.lotNo),
         caseNumber:clean(x.caseNo),
+        caseSequence:clean(x.caseSeq),
         receiveInfo:clean(x.dateReceive),
         receiveYear:clean(x.receiveYear),
         sendToHlym:clean(x.sendToHlym||x.dateUse),
@@ -1886,7 +1971,7 @@ function goKoikeLast(totalPages){AppState.koikePage=totalPages;renderKoike();}
 function goKoikePage(dir){AppState.koikePage=Math.max(1,AppState.koikePage+dir);renderKoike();}
 function resetKoikeView(){
   AppState.koikePage=1;
-  ['kq','kst','kven','kmodel','kmark','kloc'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['kq','kst','kven','kmodel','kmark','kset','kcolour','kloc'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   renderKoike();
 }
 function renderKoike(){
@@ -1897,6 +1982,8 @@ function renderKoike(){
   let v=el.querySelector('#kven')?.value||'';
   let m=el.querySelector('#kmodel')?.value||'';
   let mk=el.querySelector('#kmark')?.value||'';
+  let set=el.querySelector('#kset')?.value||'';
+  let colour=el.querySelector('#kcolour')?.value||'';
   let loc=el.querySelector('#kloc')?.value||'';
   let baseRows=koikeViewRows();
   function applySelected(rows,skip){
@@ -1904,6 +1991,8 @@ function renderKoike(){
     if(skip!=='vendor'&&v)rows=rows.filter(x=>x.vendor===v);
     if(skip!=='model'&&m)rows=rows.filter(x=>x.model===m);
     if(skip!=='markNo'&&mk)rows=rows.filter(x=>x.markNo===mk);
+    if(skip!=='setCode'&&set)rows=rows.filter(x=>x.setCode===set);
+    if(skip!=='colourCode'&&colour)rows=rows.filter(x=>x.colourCode===colour);
     if(skip!=='warehouseLocation'&&loc)rows=rows.filter(x=>x.warehouseLocation===loc);
     return rows;
   }
@@ -1915,6 +2004,8 @@ function renderKoike(){
       let vendors=unique(applySelected(baseRows,'vendor'),'vendor');if(v&&!vendors.includes(v)){v='';changed=true;}
       let models=unique(applySelected(baseRows,'model'),'model');if(m&&!models.includes(m)){m='';changed=true;}
       let marks=unique(applySelected(baseRows,'markNo'),'markNo');if(mk&&!marks.includes(mk)){mk='';changed=true;}
+      let setCodes=unique(applySelected(baseRows,'setCode'),'setCode');if(set&&!setCodes.includes(set)){set='';changed=true;}
+      let colourCodes=unique(applySelected(baseRows,'colourCode'),'colourCode');if(colour&&!colourCodes.includes(colour)){colour='';changed=true;}
       let locations=unique(applySelected(baseRows,'warehouseLocation'),'warehouseLocation');if(loc&&!locations.includes(loc)){loc='';changed=true;}
       if(!changed)break;
     }
@@ -1924,16 +2015,21 @@ function renderKoike(){
   let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
   let modelOptions=unique(applySelected(baseRows,'model'),'model');
   let markOptions=unique(applySelected(baseRows,'markNo'),'markNo');
+  let setCodeOptions=unique(applySelected(baseRows,'setCode'),'setCode');
+  let colourCodeOptions=unique(applySelected(baseRows,'colourCode'),'colourCode');
   let locationOptions=unique(applySelected(baseRows,'warehouseLocation'),'warehouseLocation');
   let rows=filter(applySelected(baseRows,null),q);
   let totalRows=rows.length;
-  let summaryHtml=statusSummaryHTML(rows,'inventoryStatus');
+  // Status controls the detail table only. A lot must always be assessed from
+  // all of its cases, otherwise selecting "In Stock" can manufacture Freeze Lots.
+  let lotSummaryRows=applySelected(baseRows,'status');
+  let summaryHtml=koikeLotSummaryHTML(lotSummaryRows,baseRows);
   let totalPages=Math.max(1,Math.ceil(totalRows/AppState.koikePageSize));
   if(AppState.koikePage>totalPages)AppState.koikePage=1;
   let start=(AppState.koikePage-1)*AppState.koikePageSize;
   let pageRows=rows.slice(start,start+AppState.koikePageSize);
   let emptyHint=baseRows.length?'' : '<div class="notice bad"><b>No KOIKE detail rows parsed.</b><br>Please upload the KOIKE detail file that contains CASE NO and Receive/Send date columns.</div>';
-  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2>${emptyHint}<div class="toolbar"><select id="kst" onchange="AppState.koikePage=1;renderKoike()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><select id="kven" onchange="AppState.koikePage=1;renderKoike()">${opt(vendorOptions,v,'All vendors')}</select><select id="kmodel" onchange="AppState.koikePage=1;renderKoike()">${opt(modelOptions,m,'All models')}</select><select id="kmark" onchange="AppState.koikePage=1;renderKoike()">${opt(markOptions,mk,'All mark no')}</select><select id="kloc" onchange="AppState.koikePage=1;renderKoike()">${opt(locationOptions,loc,'All warehouse')}</select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="AppState.koikePage=1;renderKoike()"><button class="btn secondary" onclick="resetKoikeView()">Reset View</button><button class="btn secondary" onclick="csvRows('koike-inventory.csv',getKoikeFiltered())">Export KOIKE CSV</button></div>${summaryHtml}${t(pageRows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Amount'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'receiveYear',l:'Receive Year'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sendYear',l:'Send Year'},{k:'sourceSheet',l:'Sheet'}],10000,'koike')}<div class='toolbar'><button class='btn secondary' onclick='goKoikeFirst()'>First</button><button class='btn secondary' onclick='goKoikePage(-1)'>Previous</button><span>Page ${AppState.koikePage} of ${totalPages}</span><button class='btn secondary' onclick='goKoikePage(1)'>Next</button><button class='btn secondary' onclick='goKoikeLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 1,000 rows.</p></div>`
+  el.innerHTML=`<div class="panel"><h2>KOIKE Inventory</h2>${emptyHint}<div class="toolbar"><select id="kst" onchange="AppState.koikePage=1;renderKoike()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><select id="kven" onchange="AppState.koikePage=1;renderKoike()">${opt(vendorOptions,v,'All vendors')}</select><select id="kmodel" onchange="AppState.koikePage=1;renderKoike()">${opt(modelOptions,m,'All models')}</select><select id="kmark" onchange="AppState.koikePage=1;renderKoike()">${opt(markOptions,mk,'All mark no')}</select><select id="kset" onchange="AppState.koikePage=1;renderKoike()">${opt(setCodeOptions,set,'All set codes')}</select><select id="kcolour" onchange="AppState.koikePage=1;renderKoike()">${opt(colourCodeOptions,colour,'All colour codes')}</select><select id="kloc" onchange="AppState.koikePage=1;renderKoike()">${opt(locationOptions,loc,'All warehouse')}</select><input id="kq" placeholder="Search warehouse, vendor, mark no, model..." value="${esc(q)}" oninput="AppState.koikePage=1;renderKoike()"><button class="btn secondary" onclick="resetKoikeView()">Reset View</button><button class="btn secondary" onclick="csvRows('koike-inventory.csv',getKoikeFiltered())">Export KOIKE CSV</button></div>${summaryHtml}${t(pageRows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'warehouseLocation',l:'Warehouse'},{k:'vendor',l:'Vendor'},{k:'markNo',l:'Mark No'},{k:'orderNo',l:'Order No'},{k:'model',l:'Model'},{k:'factory',l:'Factory'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotNumber',l:'Lot Amount'},{k:'caseNumber',l:'Case Number'},{k:'receiveInfo',l:'Receive'},{k:'receiveYear',l:'Receive Year'},{k:'sendToHlym',l:'Send to HLYM'},{k:'sendYear',l:'Send Year'},{k:'sourceSheet',l:'Sheet'}],10000,'koike')}<div class='toolbar'><button class='btn secondary' onclick='goKoikeFirst()'>First</button><button class='btn secondary' onclick='goKoikePage(-1)'>Previous</button><span>Page ${AppState.koikePage} of ${totalPages}</span><button class='btn secondary' onclick='goKoikePage(1)'>Next</button><button class='btn secondary' onclick='goKoikeLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 1,000 rows.</p></div>`
 }
 function getKoikeFiltered(){
   let q=document.getElementById('kq')?.value||'',
@@ -1941,12 +2037,16 @@ function getKoikeFiltered(){
       v=document.getElementById('kven')?.value||'',
       m=document.getElementById('kmodel')?.value||'',
       mk=document.getElementById('kmark')?.value||'',
+      set=document.getElementById('kset')?.value||'',
+      colour=document.getElementById('kcolour')?.value||'',
       loc=document.getElementById('kloc')?.value||'';
   let rows=koikeViewRows();
   if(st)rows=rows.filter(x=>x.inventoryStatus===st);
   if(v)rows=rows.filter(x=>x.vendor===v);
   if(m)rows=rows.filter(x=>x.model===m);
   if(mk)rows=rows.filter(x=>x.markNo===mk);
+  if(set)rows=rows.filter(x=>x.setCode===set);
+  if(colour)rows=rows.filter(x=>x.colourCode===colour);
   if(loc)rows=rows.filter(x=>x.warehouseLocation===loc);
   return filter(rows,q);
 }
@@ -1963,7 +2063,7 @@ function renderToll(){
   el.innerHTML=`<div class="panel"><h2>Toll Global Inventory</h2><div class="notice">Toll status uses movement ledger balance/closure: Open or positive balance = In Stock, Closed/zero balance = Used.</div><div class="toolbar"><select id="tst" onchange="renderToll()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option></select><input id="tq" placeholder="Search container, model, origin..." value="${esc(q)}" oninput="renderToll()"><button class="btn secondary" onclick="csvRows('toll-containers.csv',AppState.db.containers.filter(x=>x.warehouse==='Toll Global').map(x=>Object.assign({},x,{inventoryStatus:tollStatus(x,tollStatusMap())})))">Export TOLL CSV</button></div>${summaryHtml}${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'containerNo',l:'Container'},{k:'dateArrive',l:'Arrive'},{k:'dateReceive',l:'Receive'},{k:'origin',l:'Origin'},{k:'m3',l:'M3'},{k:'boxQty',l:'Boxes'},{k:'sourceSheet',l:'Sheet'}],1000,'toll')}</div>`
 }
 function renderLedger(){let el=document.getElementById('ledger');if(!hasData()){el.innerHTML=noData('Movement ledger empty until generated');return}let q=el.querySelector('#mq')?.value||'';let rows=filter(AppState.db.movements,q);el.innerHTML=`<div class="panel"><h2>Movement Ledger</h2><div class="toolbar"><input id="mq" placeholder="Search invoice, model, container..." value="${esc(q)}" oninput="renderLedger()"><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export CSV</button></div>${t(rows,[{k:'date',l:'Date'},{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'invoiceNo',l:'Invoice'},{k:'caseMarkOrderNo',l:'Order/Case Mark'},{k:'model',l:'Model'},{k:'caseIn',l:'Case In'},{k:'caseOut',l:'Case Out'},{k:'balance',l:'Balance'},{k:'location',l:'Location'}],1000,'ledger')}</div>`}
-function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',AppState.db.lineCases)">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data (Strict Rule)</button></div><p class="hint">Strict safety rule is active. Regenerate and Clear require exact confirmation text and automatic backup.</p></div>`}
+function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',inhouseCaseRows())">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data (Strict Rule)</button></div><p class="hint">Strict safety rule is active. Regenerate and Clear require exact confirmation text and automatic backup.</p></div>`}
 function toCSV(rows){if(!rows.length)return'';let ks=Object.keys(rows[0]);return ks.join(',')+'\n'+rows.map(r=>ks.map(k=>'"'+String(r[k]??'').replaceAll('"','""')+'"').join(',')).join('\n')}
 function download(n,t,mime='text/csv'){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:mime}));a.download=n;a.click();URL.revokeObjectURL(a.href)}
 function csvRows(n,rows){download(n,toCSV(rows),'text/csv')}
@@ -2014,7 +2114,7 @@ function renderInhouse(){
     return;
   }
 
-  let baseRows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let baseRows=collapseInhouseRows(inhouseCaseRows().map(normalizeInhouseDisplayRow));
 
   let q   = AppState.filters.q || '';
   let bm  = AppState.filters.bm || '';
@@ -2293,7 +2393,7 @@ function getInhouseFiltered(){
   let ord = AppState.filters.ord || '';
   let cas = AppState.filters.cas || '';
 
-  let rows=collapseInhouseRows(AppState.db.lineCases.map(normalizeInhouseDisplayRow));
+  let rows=collapseInhouseRows(inhouseCaseRows().map(normalizeInhouseDisplayRow));
 
   if(bm){
     rows=rows.filter(x=>getBaseModel(x.modelFull)===bm);
