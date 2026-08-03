@@ -905,10 +905,168 @@ function pad3Numeric(v){
   if(/^\d+(?:\.0+)?$/.test(s))return String(Math.trunc(Number(s))).padStart(3,'0');
   return '';
 }
+function splitInhouseModelCodes(row){
+  let modelRaw=clean(row.modelFull||row.modelName).toUpperCase();
+  let setRaw=clean(row.endCode).toUpperCase();
+  let colourRaw=clean(row.colourCode).toUpperCase();
+  let markRaw=clean(row.markingNo).toUpperCase();
+
+  function normalizeToken(v,allowDash){
+    return clean(v).toUpperCase().replace(allowDash?/[^A-Z0-9-]/g:/[^A-Z0-9]/g,'');
+  }
+  function isColourToken(v){
+    return /^\d{3}[A-Z0-9-]*$/.test(normalizeToken(v,true));
+  }
+  function isSetToken(v){
+    return /^[A-Z]\d{1,2}[A-Z0-9]?$/.test(normalizeToken(v,false));
+  }
+
+  // Priority pattern: MODEL SET COLOUR (e.g. "DA21 A3 010A").
+  let sources=[modelRaw,markRaw,setRaw,colourRaw].filter(Boolean);
+  let mergedSource=sources.join(' ').replace(/[\t\r\n]+/g,' ').replace(/\s{2,}/g,' ').trim();
+
+  // Multi-set scenario: "D14 1 A5-010A / A8 010A BODY PART"
+  // -> model D141, set A5 / A8, colour 010A.
+  if(mergedSource){
+    let pairRegex=/\b([A-Z]\d{1,2}[A-Z0-9]?)\s*(?:-|\s)\s*(\d{3}[A-Z0-9-]*)\b/g;
+    let pairs=[];
+    let pm;
+    while((pm=pairRegex.exec(mergedSource))!==null){
+      pairs.push({setCode:normalizeToken(pm[1],false),colourCode:normalizeToken(pm[2],true),index:pm.index});
+    }
+    if(pairs.length>=2){
+      let colourMap={};
+      pairs.forEach(function(p){colourMap[p.colourCode]=(colourMap[p.colourCode]||0)+1;});
+      let chosenColour=pairs[0].colourCode;
+      Object.keys(colourMap).forEach(function(col){
+        if(colourMap[col]>colourMap[chosenColour])chosenColour=col;
+      });
+      let setList=[];
+      pairs.forEach(function(p){
+        if(p.colourCode===chosenColour && setList.indexOf(p.setCode)<0)setList.push(p.setCode);
+      });
+      if(setList.length>=2){
+        let firstPair=pairs.find(function(p){return p.colourCode===chosenColour;})||pairs[0];
+        let prefix=mergedSource.slice(0,firstPair.index).trim();
+        let prefixTokens=prefix.split(/\s+/).map(function(t){return normalizeToken(t,false);}).filter(Boolean);
+        let modelFromPrefix='';
+        if(prefixTokens.length>=2 && /^[A-Z0-9]*[A-Z][A-Z0-9]*$/.test(prefixTokens[0]) && /^\d{1,3}[A-Z0-9]*$/.test(prefixTokens[1])){
+          modelFromPrefix=normalizeToken(prefixTokens[0]+prefixTokens[1],false);
+        }else if(prefixTokens.length>=1){
+          modelFromPrefix=prefixTokens[0];
+        }
+        if(modelFromPrefix && !isColourToken(modelFromPrefix)){
+          return {
+            model:modelFromPrefix,
+            setCode:setList.join(' / '),
+            colourCode:chosenColour
+          };
+        }
+      }
+    }
+  }
+
+  for(let si=0;si<sources.length;si++){
+    let src=sources[si].replace(/[\/|,;]+/g,' ');
+    // Split-model pattern: BRF 1 A5 010A or B2S 4 A5 010A -> model BRF1/B2S4.
+    // Prefix must include at least one letter to avoid turning pure numerics into model names.
+    let splitModel=src.match(/\b([A-Z0-9]*[A-Z][A-Z0-9]*)\s+(\d{1,3}[A-Z0-9]?)\s+([A-Z]\d{1,2}[A-Z0-9]?)\s+(\d{3}[A-Z0-9-]*)\b/);
+    if(splitModel){
+      return {
+        model:normalizeToken(splitModel[1]+splitModel[2],false),
+        setCode:normalizeToken(splitModel[3],false),
+        colourCode:normalizeToken(splitModel[4],true)
+      };
+    }
+    // Standard triplet pattern, model must contain at least one letter.
+    let m=src.match(/\b([A-Z0-9]*[A-Z][A-Z0-9]*)\s+([A-Z]\d{1,2}[A-Z0-9]?)\s+(\d{3}[A-Z0-9-]*)\b/);
+    if(m){
+      return {
+        model:normalizeToken(m[1],false),
+        setCode:normalizeToken(m[2],false),
+        colourCode:normalizeToken(m[3],true)
+      };
+    }
+    // Alternate compact pattern: SET-COLOUR in one token (e.g. A6-010A).
+    let sc=src.match(/\b([A-Z]\d{1,2}[A-Z0-9]?)\s*-\s*(\d{3}[A-Z0-9-]*)\b/);
+    if(sc){
+      let modelGuess=normalizeToken((modelRaw||src).split(/\s+/)[0],false);
+      return {
+        model:modelGuess,
+        setCode:normalizeToken(sc[1],false),
+        colourCode:normalizeToken(sc[2],true)
+      };
+    }
+  }
+
+  // Token-based fallback for less structured strings.
+  let mergedSources=[modelRaw,setRaw,markRaw,colourRaw].filter(Boolean).join(' ');
+  let tokens=mergedSources
+    .replace(/[\/|,;]+/g,' ')
+    .split(/\s+/)
+    .map(function(t){return normalizeToken(t,true);})
+    .filter(Boolean);
+
+  let model='';
+  let setCode='';
+  let colourCode='';
+
+  for(let i=0;i<tokens.length;i++){
+    if(!colourCode && isColourToken(tokens[i])){
+      colourCode=tokens[i];
+      let setIndex=(i>0 && isSetToken(tokens[i-1]))?i-1:-1;
+      if(setIndex>=0 && !setCode)setCode=tokens[setIndex];
+      if(!model){
+        if(setIndex>0){
+          // Join all tokens before set code so split model strings become one model code.
+          model=normalizeToken(tokens.slice(0,setIndex).join(''),false);
+        }else if(i>1){
+          model=normalizeToken(tokens[i-2],false);
+        }
+      }
+      break;
+    }
+  }
+
+  // Repair split model fallback: "BRF 1 ..." should stay BRF1, not "1".
+  if((!model || /^\d+$/.test(model)) && tokens.length>=2){
+    if(/^[A-Z]+$/.test(tokens[0]) && /^\d+[A-Z0-9]*$/.test(tokens[1])){
+      model=normalizeToken(tokens[0]+tokens[1],false);
+    }
+  }
+
+  if(!model && modelRaw)model=normalizeToken(modelRaw.split(/\s+/)[0],false);
+  if(!setCode){
+    if(isSetToken(setRaw))setCode=normalizeToken(setRaw,false);
+    else{
+      let setToken=tokens.map(function(t){return normalizeToken(t,false);}).find(isSetToken);
+      if(setToken)setCode=setToken;
+    }
+  }
+  if(!colourCode){
+    if(isColourToken(colourRaw))colourCode=normalizeToken(colourRaw,true);
+    else{
+      let colourToken=[modelRaw,setRaw,markRaw,colourRaw].join(' ').split(/\s+/)
+        .map(function(t){return normalizeToken(t,true);}).find(isColourToken);
+      if(colourToken)colourCode=colourToken;
+    }
+  }
+
+  return {model,setCode,colourCode};
+}
 function normalizeInhouseDisplayRow(row){
   let caseNo=clean(row.caseNo);
   let lotNo=clean(row.lotNo);
   let caseSeq=clean(row.caseSeq);
+  let parsed=splitInhouseModelCodes(row);
+  let modelFull=clean(row.modelFull);
+  let endCode=clean(row.endCode);
+  let colourCode=clean(row.colourCode);
+
+  if(parsed.model)modelFull=parsed.model;
+  if(parsed.setCode)endCode=parsed.setCode;
+  if(parsed.colourCode)colourCode=parsed.colourCode;
+
   let fullCase=normalizeInhouseCaseNo(caseNo);
   if(fullCase){
     caseNo=fullCase;
@@ -921,9 +1079,35 @@ function normalizeInhouseDisplayRow(row){
     if(seqPad)caseSeq=seqPad;
     if(!seqPad && lotPad && /^\d{1,3}\s*-\s*\d{1,3}$/.test(caseNo))caseSeq=lotPad;
   }
-  return Object.assign({},row,{caseNo,lotNo,caseSeq});
+  return Object.assign({},row,{modelFull,endCode,colourCode,caseNo,lotNo,caseSeq});
+}
+function splitInhouseSetCodes(v){
+  let raw=clean(v).toUpperCase();
+  if(!raw)return [];
+  let parts=raw
+    .split(/[\/|,;+]/)
+    .map(function(x){return clean(x).toUpperCase().replace(/[^A-Z0-9]/g,'');})
+    .filter(Boolean);
+  let setLike=parts.filter(function(x){return /^[A-Z]\d{1,2}[A-Z0-9]?$/.test(x);});
+  if(setLike.length>=2)return [...new Set(setLike)];
+  return [];
+}
+function expandInhouseSetRows(rows){
+  let out=[];
+  rows.forEach(function(row){
+    let setCodes=splitInhouseSetCodes(row.endCode);
+    if(setCodes.length<2){
+      out.push(row);
+      return;
+    }
+    setCodes.forEach(function(sc){
+      out.push(Object.assign({},row,{endCode:sc}));
+    });
+  });
+  return out;
 }
 function collapseInhouseRows(rows){
+  rows=expandInhouseSetRows(rows);
   let out=[],seen={};
   function statusRank(s){
     s=clean(s);
@@ -2347,18 +2531,15 @@ function renderInhouse(){
         {k:'vendor',l:'Vendor'},
         {k:'line',l:'Line'},
         {k:'modelFull',l:'Model'},
-        {k:'endCode',l:'Sheet'},
         {k:'orderNo',l:'Order No'},
+        {k:'endCode',l:'Set Code'},
         {k:'colourCode',l:'Colour Code'},
-        {k:'caseNo',l:'Case No'},
         {k:'lotNo',l:'Lot'},
         {k:'caseSeq',l:'Case'},
+        {k:'caseNo',l:'Case No'},
         {k:'dateReceive',l:'Actual Receive'},
         {k:'expectedReceive',l:'Expected Receive'},
-        {k:'robFull',l:'R/F'},
-        {k:'dateUse',l:'Date Use'},
-        {k:'seq',l:'SEQ'},
-        {k:'sourceRow',l:'Excel Row'}
+        {k:'dateUse',l:'Date Use'}
       ],10000,'inhouse')
       +
       `<div class="toolbar">
