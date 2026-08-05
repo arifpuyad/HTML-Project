@@ -2354,6 +2354,12 @@ function formatTollDateMY(value){
   let year=String(d.getFullYear());
   return day+'/'+month+'/'+year;
 }
+function formatTollRoute(value){
+  let route=clean(value).toUpperCase();
+  let fac=route.match(/^FAC\s*(\d+)$/i);
+  if(fac)return 'Factory '+fac[1];
+  return clean(value);
+}
 function tollOutboundStatus(row){
   let delivery=clean(row.deliveryDate);
   let arrive=clean(row.dateArrived||row.dateArrive);
@@ -2387,7 +2393,7 @@ function tollOutboundRows(){
       if(parsed.isJOrder&&parsed.orderNo)resolvedInvoice=parsed.orderNo;
       return {
         status:tollOutboundStatus(x),
-        routes:clean(x.routes||x.location),
+        routes:formatTollRoute(x.routes||x.location),
         vendor:clean(x.country||x.origin),
         invoiceNo:resolvedInvoice,
         orderNo:parsed.orderNo||clean(x.orderNo)||tollOrderFromCaseMark(x.caseMarkOrderNo),
