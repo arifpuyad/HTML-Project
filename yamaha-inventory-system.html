@@ -1167,7 +1167,7 @@ function vendorFromInstant(name,rows){
   let vendor=sourceText.includes('YIMM')?'YIMM':(sourceText.includes('VIETNAM')||sourceText.includes('YMVN'))?'YMVN':sourceText.includes('TYM')?'TYM':(sourceText.includes('INDIA')||sourceText.includes('IYM'))?'IYM':(sourceText.includes('CKD')||sourceText.includes('YMC'))?'YMC':'UNKNOWN';
   return{vendor,line:'Line 1,2,3'}
 }
-function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[],lineCases:[]};if(type==='toll'){let h=findHeader(rows,['Container']);let head=rows[h].map(norm);let c=idx(head,['container']);if(c<0)c=2;let inbound=sheet.toLowerCase().includes('inbound')||idx(head,['no. of box'])>=0;if(inbound){for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;o.containers.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,containerNo:clean(r[c]).toUpperCase(),dateArrive:dval(r[idx(head,['date arrive'])]),dateReceive:dval(r[idx(head,['date receive'])]),origin:clean(r[idx(head,['origin'])]),m3:num(r[idx(head,['m3'])]),boxQty:num(r[idx(head,['no. of box'])]),palletQty:0})}}else{let cCountry=idx(head,['country']);if(cCountry<0)cCountry=3;let cCaseMark=idx(head,['case mark order no']);if(cCaseMark<0)cCaseMark=8;let cDesc=10;let cLot=11;let cCaseNo=12;let cBalance=idx(head,['balance']);if(cBalance<0)cBalance=15;let cDelivery=17;let cRoute=idx(head,['routes','route','location']);if(cRoute<0)cRoute=19;let cDateArrive=idx(head,['date arrive','arrive date']);if(cDateArrive<0)cDateArrive=0;let cContainer=idx(head,['container','container no','container number']);if(cContainer<0)cContainer=2;for(let i=h+1;i<rows.length;i++){let r=rows[i]||[];let caseMarkVal=clean(r[cCaseMark]);let descVal=clean(r[cDesc]);let routeVal=clean(r[cRoute]);let hasSignal=caseMarkVal||descVal||routeVal;if(!hasSignal)continue;let b=num(r[cBalance]);o.movements.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,date:dval(r[cDelivery])||dval(r[cDateArrive]),dateArrive:dval(r[cDateArrive]),deliveryDate:dval(r[cDelivery]),containerNo:clean(r[cContainer]).toUpperCase(),invoiceNo:caseMarkVal,caseMarkOrderNo:caseMarkVal,productInfo:descVal,model:descVal,lotAmount:clean(r[cLot]),caseNo:clean(r[cCaseNo]),balance:b,routes:routeVal,location:routeVal,country:clean(r[cCountry]),status:b>0?'Open':'Closed'})}}}
+function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[],lineCases:[]};if(type==='toll'){let h=findHeader(rows,['Container']);let head=rows[h].map(norm);let c=idx(head,['container']);if(c<0)c=2;let inbound=sheet.toLowerCase().includes('inbound')||idx(head,['no. of box'])>=0;if(inbound){for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;o.containers.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,containerNo:clean(r[c]).toUpperCase(),dateArrive:dval(r[idx(head,['date arrive'])]),dateReceive:dval(r[idx(head,['date receive'])]),origin:clean(r[idx(head,['origin'])]),m3:num(r[idx(head,['m3'])]),boxQty:num(r[idx(head,['no. of box'])]),palletQty:0})}}else{let cCountry=idx(head,['country']);if(cCountry<0)cCountry=3;let cCaseMark=idx(head,['case mark order no']);if(cCaseMark<0)cCaseMark=8;let cMarket=idx(head,['modal','model']);if(cMarket<0)cMarket=9;let cDesc=10;let cLot=11;let cCaseNo=12;let cBalance=idx(head,['balance']);if(cBalance<0)cBalance=15;let cDelivery=17;let cRoute=idx(head,['routes','route','location']);if(cRoute<0)cRoute=19;let cDateArrive=idx(head,['date arrive','arrive date']);if(cDateArrive<0)cDateArrive=0;let cContainer=idx(head,['container','container no','container number']);if(cContainer<0)cContainer=2;for(let i=h+1;i<rows.length;i++){let r=rows[i]||[];let caseMarkVal=clean(r[cCaseMark]);let descVal=clean(r[cDesc]);let routeVal=clean(r[cRoute]);let hasSignal=caseMarkVal||descVal||routeVal;if(!hasSignal)continue;let b=num(r[cBalance]);o.movements.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,date:dval(r[cDelivery])||dval(r[cDateArrive]),dateArrive:dval(r[cDateArrive]),deliveryDate:dval(r[cDelivery]),containerNo:clean(r[cContainer]).toUpperCase(),invoiceNo:caseMarkVal,caseMarkOrderNo:caseMarkVal,marketName:clean(r[cMarket]),productInfo:descVal,model:descVal,lotAmount:clean(r[cLot]),caseNo:clean(r[cCaseNo]),balance:b,routes:routeVal,location:routeVal,country:clean(r[cCountry]),status:b>0?'Open':'Closed'})}}}
 if(type==='koike'){
   // Placeholder values are not real model or set-code values and must not enter filters.
   function isKoikePlaceholderCode(value){return /^(?:9999|999999)$/.test(clean(value));}
@@ -1934,6 +1934,62 @@ function koikeLotSummaryHTML(rows,standardRows){
   });
   return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">Lot in Stock</div><div class="value">${fmt(lotInStock)}</div></div><div class="kpi"><div class="label">Freeze Lot</div><div class="value">${fmt(freezeLot)}</div></div></div>`;
 }
+function tollLotSummaryHTML(rows,standardRows){
+  function collectLots(sourceRows){
+    let grouped={};
+    sourceRows.forEach(function(r,index){
+      let model=clean(r.model);
+      let marketName=clean(r.marketName);
+      let lot=clean(r.lotAmount);
+      if(!model||!lot)return;
+      let vendor=clean(r.vendor).toUpperCase();
+      let orderNo=clean(r.orderNo).toUpperCase();
+      let setCode=clean(r.setCode).toUpperCase();
+      let colourCode=clean(r.colourCode).toUpperCase();
+      let route=clean(r.routes).toUpperCase();
+      let standardKey=[vendor,model.toUpperCase(),marketName.toUpperCase(),setCode,colourCode,route].join('|');
+      let key=[standardKey,orderNo,lot.toUpperCase()].join('|');
+      if(!grouped[key])grouped[key]={standardKey:standardKey,cases:new Map()};
+      let caseId=clean(r.caseNo);
+      if(!caseId)caseId='__row_'+index;
+      let previous=grouped[key].cases.get(caseId);
+      let status=clean(r.status);
+      if(!previous||status==='Used')grouped[key].cases.set(caseId,status);
+    });
+    return grouped;
+  }
+  let lots=collectLots(rows);
+  let standardLots=collectLots(standardRows&&standardRows.length?standardRows:rows);
+  let caseCounts={};
+  Object.keys(standardLots).forEach(function(key){
+    let lot=standardLots[key],count=lot.cases.size;
+    if(!caseCounts[lot.standardKey])caseCounts[lot.standardKey]={};
+    caseCounts[lot.standardKey][count]=(caseCounts[lot.standardKey][count]||0)+1;
+  });
+  function standardCaseCount(lot){
+    let counts=caseCounts[lot.standardKey]||{},standard=0,frequency=-1;
+    Object.keys(counts).forEach(function(count){
+      let number=Number(count),seen=counts[count];
+      if(seen>frequency||(seen===frequency&&(standard===0||number<standard))){
+        standard=number;frequency=seen;
+      }
+    });
+    return standard;
+  }
+  let lotInStock=0,freezeLot=0;
+  Object.keys(lots).forEach(function(key){
+    let lot=lots[key],stockCases=0,usedCases=0;
+    lot.cases.forEach(function(status){
+      if(status==='In Stock')stockCases++;
+      if(status==='Used')usedCases++;
+    });
+    if(!stockCases)return;
+    let standard=standardCaseCount(lot);
+    if((standard>0&&stockCases<standard)||usedCases>0)freezeLot++;
+    else lotInStock++;
+  });
+  return `<div class="kpis" style="grid-template-columns:repeat(2,minmax(180px,1fr));margin:8px 0 12px"><div class="kpi"><div class="label">Lot in Stock</div><div class="value">${fmt(lotInStock)}</div></div><div class="kpi"><div class="label">Freeze Lot</div><div class="value">${fmt(freezeLot)}</div></div></div>`;
+}
 function inhouseLotSummaryHTML(rows){
   let lots={};
   rows.forEach(function(r){
@@ -2275,12 +2331,38 @@ function parseTollProductInfo(raw){
   }
   return {orderNo,model,setCode,colourCode,isJOrder};
 }
+function parseTollDateValue(value){
+  let d=parseInventoryDate(value);
+  if(d)return d;
+  let s=clean(value);
+  // Outbound sheets often store short years like 6/29/26.
+  let m=s.match(/^(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2})$/);
+  if(!m)return null;
+  let a=Number(m[1]),b=Number(m[2]),y=2000+Number(m[3]);
+  // Prefer month/day for values like 6/29/26, then fallback day/month.
+  let md=new Date(y,a-1,b);
+  if(!isNaN(md) && md.getFullYear()===y && md.getMonth()===(a-1) && md.getDate()===b)return md;
+  let dm=new Date(y,b-1,a);
+  if(!isNaN(dm) && dm.getFullYear()===y && dm.getMonth()===(b-1) && dm.getDate()===a)return dm;
+  return null;
+}
+function formatTollDateMY(value){
+  let d=parseTollDateValue(value);
+  if(!d)return clean(value);
+  let day=String(d.getDate()).padStart(2,'0');
+  let month=String(d.getMonth()+1).padStart(2,'0');
+  let year=String(d.getFullYear());
+  return day+'/'+month+'/'+year;
+}
 function tollOutboundStatus(row){
+  let delivery=clean(row.deliveryDate);
+  let arrive=clean(row.dateArrived||row.dateArrive);
+  // Operational rule: blank delivery means the case is still in Toll warehouse.
+  if(!delivery)return 'In Stock';
+
   let bal=num(row.balance);
   if(bal===0)return 'Used';
-  let delivery=clean(row.deliveryDate);
-  let arrive=clean(row.dateArrive);
-  let dDelivery=parseInventoryDate(delivery);
+  let dDelivery=parseTollDateValue(delivery);
   if(dDelivery){
     let today=new Date();
     today.setHours(0,0,0,0);
@@ -2310,18 +2392,19 @@ function tollOutboundRows(){
         invoiceNo:resolvedInvoice,
         orderNo:parsed.orderNo||clean(x.orderNo)||tollOrderFromCaseMark(x.caseMarkOrderNo),
         model:parsed.model,
+        marketName:clean(x.marketName||x.market||x.modal),
         setCode:parsed.setCode||clean(x.setCode),
         colourCode:parsed.colourCode||clean(x.colourCode),
         lotAmount:clean(x.lotAmount||x.caseIn),
         caseNo:clean(x.caseNo||x.caseOut),
-        dateArrived:clean(x.dateArrive),
-        deliveryDate:clean(x.deliveryDate||x.date)
+        dateArrived:formatTollDateMY(x.dateArrive),
+        deliveryDate:formatTollDateMY(x.deliveryDate)
       };
     });
 }
 function resetTollView(){
   AppState.tollPage=1;
-  ['tq','tst','tvendor','tmodel','tord','tset','tcolour','troute'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  ['tq','tst','tvendor','tmodel','tmarket','tord','tset','tcolour','troute'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   renderToll();
 }
 function getTollFiltered(){
@@ -2329,6 +2412,7 @@ function getTollFiltered(){
   let st=document.getElementById('tst')?.value||'';
   let vendor=document.getElementById('tvendor')?.value||'';
   let model=document.getElementById('tmodel')?.value||'';
+  let market=document.getElementById('tmarket')?.value||'';
   let ord=document.getElementById('tord')?.value||'';
   let set=document.getElementById('tset')?.value||'';
   let colour=document.getElementById('tcolour')?.value||'';
@@ -2337,6 +2421,7 @@ function getTollFiltered(){
   if(st)rows=rows.filter(function(x){return x.status===st;});
   if(vendor)rows=rows.filter(function(x){return x.vendor===vendor;});
   if(model)rows=rows.filter(function(x){return x.model===model;});
+  if(market)rows=rows.filter(function(x){return x.marketName===market;});
   if(ord)rows=rows.filter(function(x){return x.orderNo===ord;});
   if(set)rows=rows.filter(function(x){return x.setCode===set;});
   if(colour)rows=rows.filter(function(x){return x.colourCode===colour;});
@@ -2350,6 +2435,7 @@ function renderToll(){
   let st=el.querySelector('#tst')?.value||'';
   let vendor=el.querySelector('#tvendor')?.value||'';
   let model=el.querySelector('#tmodel')?.value||'';
+  let market=el.querySelector('#tmarket')?.value||'';
   let ord=el.querySelector('#tord')?.value||'';
   let set=el.querySelector('#tset')?.value||'';
   let colour=el.querySelector('#tcolour')?.value||'';
@@ -2360,6 +2446,7 @@ function renderToll(){
     if(skip!=='status'&&st)rows=rows.filter(function(x){return x.status===st;});
     if(skip!=='vendor'&&vendor)rows=rows.filter(function(x){return x.vendor===vendor;});
     if(skip!=='model'&&model)rows=rows.filter(function(x){return x.model===model;});
+    if(skip!=='marketName'&&market)rows=rows.filter(function(x){return x.marketName===market;});
     if(skip!=='orderNo'&&ord)rows=rows.filter(function(x){return x.orderNo===ord;});
     if(skip!=='setCode'&&set)rows=rows.filter(function(x){return x.setCode===set;});
     if(skip!=='colourCode'&&colour)rows=rows.filter(function(x){return x.colourCode===colour;});
@@ -2378,6 +2465,7 @@ function renderToll(){
       let statuses=statusList(applySelected(baseRows,'status'));if(st&&!statuses.includes(st)){st='';changed=true;}
       let vendors=unique(applySelected(baseRows,'vendor'),'vendor');if(vendor&&!vendors.includes(vendor)){vendor='';changed=true;}
       let models=unique(applySelected(baseRows,'model'),'model');if(model&&!models.includes(model)){model='';changed=true;}
+      let markets=unique(applySelected(baseRows,'marketName'),'marketName');if(market&&!markets.includes(market)){market='';changed=true;}
       let orders=unique(applySelected(baseRows,'orderNo'),'orderNo');if(ord&&!orders.includes(ord)){ord='';changed=true;}
       let setCodes=unique(applySelected(baseRows,'setCode'),'setCode');if(set&&!setCodes.includes(set)){set='';changed=true;}
       let colourCodes=unique(applySelected(baseRows,'colourCode'),'colourCode');if(colour&&!colourCodes.includes(colour)){colour='';changed=true;}
@@ -2390,6 +2478,7 @@ function renderToll(){
   let statusOptions=statusList(applySelected(baseRows,'status'));
   let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
   let modelOptions=unique(applySelected(baseRows,'model'),'model');
+  let marketOptions=unique(applySelected(baseRows,'marketName'),'marketName');
   let orderOptions=unique(applySelected(baseRows,'orderNo'),'orderNo');
   let setCodeOptions=unique(applySelected(baseRows,'setCode'),'setCode');
   let colourCodeOptions=unique(applySelected(baseRows,'colourCode'),'colourCode');
@@ -2400,10 +2489,12 @@ function renderToll(){
   if(AppState.tollPage>totalPages)AppState.tollPage=1;
   let start=(AppState.tollPage-1)*AppState.tollPageSize;
   let pageRows=rows.slice(start,start+AppState.tollPageSize);
-  let summaryHtml=statusSummaryHTML(rows,'status');
+  // Keep lot summary independent from status filter, same behavior as KOIKE.
+  let lotSummaryRows=applySelected(baseRows,'status');
+  let summaryHtml=tollLotSummaryHTML(lotSummaryRows,baseRows);
   let emptyHint=baseRows.length?'' : '<div class="notice bad"><b>No Toll Global Outbound rows parsed.</b><br>Please upload Toll Global file that contains the Outbound sheet.</div>';
 
-  el.innerHTML=`<div class="panel"><h2>Toll Global Inventory</h2>${emptyHint}<div class="notice">Outbound sheet only. Header layout standardized as requested.</div><div class="toolbar"><select id="tst" onchange="AppState.tollPage=1;renderToll()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><select id="tvendor" onchange="AppState.tollPage=1;renderToll()">${opt(vendorOptions,vendor,'All vendors')}</select><select id="tmodel" onchange="AppState.tollPage=1;renderToll()">${opt(modelOptions,model,'All models')}</select><select id="tord" onchange="AppState.tollPage=1;renderToll()">${opt(orderOptions,ord,'All order no')}</select><select id="tset" onchange="AppState.tollPage=1;renderToll()">${opt(setCodeOptions,set,'All set codes')}</select><select id="tcolour" onchange="AppState.tollPage=1;renderToll()">${opt(colourCodeOptions,colour,'All colour codes')}</select><select id="troute" onchange="AppState.tollPage=1;renderToll()">${opt(routeOptions,route,'All routes')}</select><input id="tq" placeholder="Search status, vendor, model, order, set code, colour code, route..." value="${esc(q)}" oninput="AppState.tollPage=1;renderToll()"><button class="btn secondary" onclick="resetTollView()">Reset View</button><button class="btn secondary" onclick="csvRows('toll-outbound-standardized.csv',getTollFiltered())">Export TOLL CSV</button></div>${summaryHtml}${t(pageRows,[{k:'status',l:'STATUS',f:pill},{k:'routes',l:'ROUTES'},{k:'vendor',l:'Vendor'},{k:'invoiceNo',l:'Invoice No'},{k:'orderNo',l:'Order No'},{k:'model',l:'Model'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotAmount',l:'Lot Amount'},{k:'caseNo',l:'Case#'},{k:'dateArrived',l:'Date Arrived'},{k:'deliveryDate',l:'Delivery Date'}],1000,'toll')}<div class='toolbar'><button class='btn secondary' onclick='goTollFirst()'>First</button><button class='btn secondary' onclick='goTollPage(-1)'>Previous</button><span>Page ${AppState.tollPage} of ${totalPages}</span><button class='btn secondary' onclick='goTollPage(1)'>Next</button><button class='btn secondary' onclick='goTollLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 1,000 rows.</p></div>`
+  el.innerHTML=`<div class="panel"><h2>Toll Global Inventory</h2>${emptyHint}<div class="notice">Outbound sheet only. Header layout standardized as requested.</div><div class="toolbar"><select id="tst" onchange="AppState.tollPage=1;renderToll()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><select id="tvendor" onchange="AppState.tollPage=1;renderToll()">${opt(vendorOptions,vendor,'All vendors')}</select><select id="tmodel" onchange="AppState.tollPage=1;renderToll()">${opt(modelOptions,model,'All models')}</select><select id="tord" onchange="AppState.tollPage=1;renderToll()">${opt(orderOptions,ord,'All order no')}</select><select id="tmarket" onchange="AppState.tollPage=1;renderToll()">${opt(marketOptions,market,'All market names')}</select><select id="tset" onchange="AppState.tollPage=1;renderToll()">${opt(setCodeOptions,set,'All set codes')}</select><select id="tcolour" onchange="AppState.tollPage=1;renderToll()">${opt(colourCodeOptions,colour,'All colour codes')}</select><select id="troute" onchange="AppState.tollPage=1;renderToll()">${opt(routeOptions,route,'All routes')}</select><input id="tq" placeholder="Search status, vendor, model, order, market name, set code, colour code, route..." value="${esc(q)}" oninput="AppState.tollPage=1;renderToll()"><button class="btn secondary" onclick="resetTollView()">Reset View</button><button class="btn secondary" onclick="csvRows('toll-outbound-standardized.csv',getTollFiltered())">Export TOLL CSV</button></div>${summaryHtml}${t(pageRows,[{k:'status',l:'STATUS',f:pill},{k:'routes',l:'ROUTES'},{k:'vendor',l:'Vendor'},{k:'invoiceNo',l:'Invoice No'},{k:'orderNo',l:'Order No'},{k:'model',l:'Model'},{k:'marketName',l:'Market Name'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotAmount',l:'Lot Amount'},{k:'caseNo',l:'Case#'},{k:'dateArrived',l:'Date Arrived'},{k:'deliveryDate',l:'Delivery Date'}],1000,'toll')}<div class='toolbar'><button class='btn secondary' onclick='goTollFirst()'>First</button><button class='btn secondary' onclick='goTollPage(-1)'>Previous</button><span>Page ${AppState.tollPage} of ${totalPages}</span><button class='btn secondary' onclick='goTollPage(1)'>Next</button><button class='btn secondary' onclick='goTollLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 1,000 rows.</p></div>`
 }
 function renderLedger(){let el=document.getElementById('ledger');if(!hasData()){el.innerHTML=noData('Movement ledger empty until generated');return}let q=el.querySelector('#mq')?.value||'';let rows=filter(AppState.db.movements,q);el.innerHTML=`<div class="panel"><h2>Movement Ledger</h2><div class="toolbar"><input id="mq" placeholder="Search invoice, model, container..." value="${esc(q)}" oninput="renderLedger()"><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export CSV</button></div>${t(rows,[{k:'date',l:'Date'},{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'invoiceNo',l:'Invoice'},{k:'caseMarkOrderNo',l:'Order/Case Mark'},{k:'model',l:'Model'},{k:'caseIn',l:'Case In'},{k:'caseOut',l:'Case Out'},{k:'balance',l:'Balance'},{k:'location',l:'Location'}],1000,'ledger')}</div>`}
 function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',inhouseCaseRows())">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data (Strict Rule)</button></div><p class="hint">Strict safety rule is active. Regenerate and Clear require exact confirmation text and automatic backup.</p></div>`}
