@@ -580,7 +580,7 @@ body.flow-app header{display:block}.layout{display:grid;grid-template-columns:25
 <main class="content"><section id="upload" class="view"></section><section id="inhouse" class="view" hidden></section><section id="koike" class="view" hidden></section><section id="toll" class="view" hidden></section><section id="settings" class="view" hidden></section><section id="dash" class="view" hidden></section><footer>Design and Code by Muhammad Arif</footer></main></div>
 <script>
 // ==================== APPLICATION STATE ====================
-const AppState={files:{toll:[],koike:[],line:[],line123:[]},db:null,sort:{},showAll:false,inhousePage:1,inhousePageSize:5000,koikePage:1,koikePageSize:1000};
+const AppState={files:{toll:[],koike:[],line:[],line123:[]},db:null,sort:{},showAll:false,inhousePage:1,inhousePageSize:5000,koikePage:1,koikePageSize:1000,tollPage:1,tollPageSize:1000};
 const MAX_FILE_SIZE=1024*1024*1024;// 1GB limit
 // Pre-compiled regex patterns for better performance
 const REGEX_VENDOR=/YMCN|YIMM|YMVN|TYM|IYM|YMC/i;
@@ -1167,7 +1167,7 @@ function vendorFromInstant(name,rows){
   let vendor=sourceText.includes('YIMM')?'YIMM':(sourceText.includes('VIETNAM')||sourceText.includes('YMVN'))?'YMVN':sourceText.includes('TYM')?'TYM':(sourceText.includes('INDIA')||sourceText.includes('IYM'))?'IYM':(sourceText.includes('CKD')||sourceText.includes('YMC'))?'YMC':'UNKNOWN';
   return{vendor,line:'Line 1,2,3'}
 }
-function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[],lineCases:[]};if(type==='toll'){let h=findHeader(rows,['Container']);let head=rows[h].map(norm);let c=idx(head,['container']);if(c<0)c=2;let inbound=sheet.toLowerCase().includes('inbound')||idx(head,['no. of box'])>=0;if(inbound){for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;o.containers.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,containerNo:clean(r[c]).toUpperCase(),dateArrive:dval(r[idx(head,['date arrive'])]),dateReceive:dval(r[idx(head,['date receive'])]),origin:clean(r[idx(head,['origin'])]),m3:num(r[idx(head,['m3'])]),boxQty:num(r[idx(head,['no. of box'])]),palletQty:0})}}else{for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;let b=num(r[idx(head,['balance'])]);o.movements.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,date:dval(r[idx(head,['date offloading'])])||dval(r[idx(head,['date arrive'])]),containerNo:clean(r[c]).toUpperCase(),invoiceNo:clean(r[idx(head,['invoice no'])]),caseMarkOrderNo:clean(r[idx(head,['case mark order no'])]),model:clean(r[idx(head,['modal'])]),caseIn:clean(r[idx(head,['case in'])]),caseOut:clean(r[idx(head,['case out'])]),balance:b,location:clean(r[idx(head,['location'])]),status:b>0?'Open':'Closed'})}}}
+function transform(rows,type,sheet,sourceFile){let o={containers:[],movements:[],lineCases:[]};if(type==='toll'){let h=findHeader(rows,['Container']);let head=rows[h].map(norm);let c=idx(head,['container']);if(c<0)c=2;let inbound=sheet.toLowerCase().includes('inbound')||idx(head,['no. of box'])>=0;if(inbound){for(let i=h+1;i<rows.length;i++){let r=rows[i];if(!r[c])continue;o.containers.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,containerNo:clean(r[c]).toUpperCase(),dateArrive:dval(r[idx(head,['date arrive'])]),dateReceive:dval(r[idx(head,['date receive'])]),origin:clean(r[idx(head,['origin'])]),m3:num(r[idx(head,['m3'])]),boxQty:num(r[idx(head,['no. of box'])]),palletQty:0})}}else{let cCountry=idx(head,['country']);if(cCountry<0)cCountry=3;let cCaseMark=idx(head,['case mark order no']);if(cCaseMark<0)cCaseMark=8;let cDesc=10;let cLot=11;let cCaseNo=12;let cBalance=idx(head,['balance']);if(cBalance<0)cBalance=15;let cDelivery=17;let cRoute=idx(head,['routes','route','location']);if(cRoute<0)cRoute=19;let cDateArrive=idx(head,['date arrive','arrive date']);if(cDateArrive<0)cDateArrive=0;let cContainer=idx(head,['container','container no','container number']);if(cContainer<0)cContainer=2;for(let i=h+1;i<rows.length;i++){let r=rows[i]||[];let caseMarkVal=clean(r[cCaseMark]);let descVal=clean(r[cDesc]);let routeVal=clean(r[cRoute]);let hasSignal=caseMarkVal||descVal||routeVal;if(!hasSignal)continue;let b=num(r[cBalance]);o.movements.push({warehouse:'Toll Global',sourceFile,sourceSheet:sheet,date:dval(r[cDelivery])||dval(r[cDateArrive]),dateArrive:dval(r[cDateArrive]),deliveryDate:dval(r[cDelivery]),containerNo:clean(r[cContainer]).toUpperCase(),invoiceNo:caseMarkVal,caseMarkOrderNo:caseMarkVal,productInfo:descVal,model:descVal,lotAmount:clean(r[cLot]),caseNo:clean(r[cCaseNo]),balance:b,routes:routeVal,location:routeVal,country:clean(r[cCountry]),status:b>0?'Open':'Closed'})}}}
 if(type==='koike'){
   // Placeholder values are not real model or set-code values and must not enter filters.
   function isKoikePlaceholderCode(value){return /^(?:9999|999999)$/.test(clean(value));}
@@ -2234,17 +2234,176 @@ function getKoikeFiltered(){
   if(loc)rows=rows.filter(x=>x.warehouseLocation===loc);
   return filter(rows,q);
 }
+function goTollFirst(){AppState.tollPage=1;renderToll();}
+function goTollLast(totalPages){AppState.tollPage=totalPages;renderToll();}
+function goTollPage(dir){AppState.tollPage=Math.max(1,AppState.tollPage+dir);renderToll();}
+function parseTollProductInfo(raw){
+  let txt=clean(raw).toUpperCase().replace(/\s+/g,' ');
+  if(!txt)return {orderNo:'',model:'',setCode:'',colourCode:'',isJOrder:false};
+  let orderNo='';
+  let model='';
+  let setCode='';
+  let colourCode='';
+  let isJOrder=false;
+  let mOrder=txt.match(/\bYAMAHA\s+([A-Z0-9]{5,10})\b/);
+  if(mOrder)orderNo=mOrder[1];
+  let mSpec=txt.match(/\bYAMAHA\s+[A-Z0-9]{5,10}\s+([A-Z0-9]+(?:-[A-Z0-9]+)?)\b/);
+  let spec=mSpec?mSpec[1]:'';
+  if(!spec&&orderNo&&/^J[A-Z0-9]{5,10}$/.test(orderNo)){
+    // Replacement-part format like "YAMAHA J54P20"
+    isJOrder=true;
+    model='J Order';
+    return {orderNo,model,setCode,colourCode,isJOrder};
+  }
+  if(spec){
+    let base=spec.split('-')[0].replace(/[^A-Z0-9]/g,'');
+    if(/^[A-Z0-9]{4,}$/.test(base)){
+      // Standard split: trailing 2 chars are Set Code, leading chars are Model.
+      setCode=base.slice(-2);
+      model=base.slice(0,-2);
+    }else{
+      let mModel=base.match(/([A-Z]\d{3})/);
+      if(mModel)model=mModel[1];
+      if(mModel){
+        let tail=base.slice(base.indexOf(mModel[1])+mModel[1].length);
+        let mSet=tail.match(/([A-Z]\d)$/);
+        if(mSet)setCode=mSet[1];
+      }
+    }
+    let mColour=spec.match(/-([A-Z0-9]{3,6})$/);
+    if(mColour)colourCode=mColour[1];
+  }
+  return {orderNo,model,setCode,colourCode,isJOrder};
+}
+function tollOutboundStatus(row){
+  let bal=num(row.balance);
+  if(bal===0)return 'Used';
+  let delivery=clean(row.deliveryDate);
+  let arrive=clean(row.dateArrive);
+  let dDelivery=parseInventoryDate(delivery);
+  if(dDelivery){
+    let today=new Date();
+    today.setHours(0,0,0,0);
+    dDelivery.setHours(0,0,0,0);
+    if(dDelivery<=today)return 'Used';
+  }
+  if(arrive&&!delivery)return 'In Stock';
+  return 'In Stock';
+}
+function tollOrderFromCaseMark(caseMark){
+  let s=clean(caseMark).toUpperCase();
+  if(!s)return '';
+  let m=s.match(/\b[A-Z][A-Z0-9]{4,9}\b/);
+  return m?m[0]:'';
+}
+function tollOutboundRows(){
+  return AppState.db.movements
+    .filter(function(x){return x.warehouse==='Toll Global'&&/outbound/i.test(clean(x.sourceSheet));})
+    .map(function(x){
+      let parsed=parseTollProductInfo(x.productInfo||x.model);
+      let resolvedInvoice=clean(x.caseMarkOrderNo||x.invoiceNo);
+      if(parsed.isJOrder&&parsed.orderNo)resolvedInvoice=parsed.orderNo;
+      return {
+        status:tollOutboundStatus(x),
+        routes:clean(x.routes||x.location),
+        vendor:clean(x.country||x.origin),
+        invoiceNo:resolvedInvoice,
+        orderNo:parsed.orderNo||clean(x.orderNo)||tollOrderFromCaseMark(x.caseMarkOrderNo),
+        model:parsed.model,
+        setCode:parsed.setCode||clean(x.setCode),
+        colourCode:parsed.colourCode||clean(x.colourCode),
+        lotAmount:clean(x.lotAmount||x.caseIn),
+        caseNo:clean(x.caseNo||x.caseOut),
+        dateArrived:clean(x.dateArrive),
+        deliveryDate:clean(x.deliveryDate||x.date)
+      };
+    });
+}
+function resetTollView(){
+  AppState.tollPage=1;
+  ['tq','tst','tvendor','tmodel','tord','tset','tcolour','troute'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderToll();
+}
+function getTollFiltered(){
+  let q=document.getElementById('tq')?.value||'';
+  let st=document.getElementById('tst')?.value||'';
+  let vendor=document.getElementById('tvendor')?.value||'';
+  let model=document.getElementById('tmodel')?.value||'';
+  let ord=document.getElementById('tord')?.value||'';
+  let set=document.getElementById('tset')?.value||'';
+  let colour=document.getElementById('tcolour')?.value||'';
+  let route=document.getElementById('troute')?.value||'';
+  let rows=tollOutboundRows();
+  if(st)rows=rows.filter(function(x){return x.status===st;});
+  if(vendor)rows=rows.filter(function(x){return x.vendor===vendor;});
+  if(model)rows=rows.filter(function(x){return x.model===model;});
+  if(ord)rows=rows.filter(function(x){return x.orderNo===ord;});
+  if(set)rows=rows.filter(function(x){return x.setCode===set;});
+  if(colour)rows=rows.filter(function(x){return x.colourCode===colour;});
+  if(route)rows=rows.filter(function(x){return x.routes===route;});
+  return filter(rows,q);
+}
 function renderToll(){
   let el=document.getElementById('toll');
   if(!hasData()){el.innerHTML=noData('Toll Global inventory empty until generated');return}
   let q=el.querySelector('#tq')?.value||'';
   let st=el.querySelector('#tst')?.value||'';
-  let statusMap=tollStatusMap();
-  let rows=AppState.db.containers.filter(x=>x.warehouse==='Toll Global').map(function(x){return Object.assign({},x,{inventoryStatus:tollStatus(x,statusMap)})});
-  if(st)rows=rows.filter(x=>x.inventoryStatus===st);
-  rows=filter(rows,q);
-  let summaryHtml=statusSummaryHTML(rows,'inventoryStatus');
-  el.innerHTML=`<div class="panel"><h2>Toll Global Inventory</h2><div class="notice">Toll status uses movement ledger balance/closure: Open or positive balance = In Stock, Closed/zero balance = Used.</div><div class="toolbar"><select id="tst" onchange="renderToll()"><option value="">All status</option><option value="In Stock" ${st==='In Stock'?'selected':''}>In Stock</option><option value="Used" ${st==='Used'?'selected':''}>Used</option></select><input id="tq" placeholder="Search container, model, origin..." value="${esc(q)}" oninput="renderToll()"><button class="btn secondary" onclick="csvRows('toll-containers.csv',AppState.db.containers.filter(x=>x.warehouse==='Toll Global').map(x=>Object.assign({},x,{inventoryStatus:tollStatus(x,tollStatusMap())})))">Export TOLL CSV</button></div>${summaryHtml}${t(rows,[{k:'inventoryStatus',l:'Status',f:pill},{k:'containerNo',l:'Container'},{k:'dateArrive',l:'Arrive'},{k:'dateReceive',l:'Receive'},{k:'origin',l:'Origin'},{k:'m3',l:'M3'},{k:'boxQty',l:'Boxes'},{k:'sourceSheet',l:'Sheet'}],1000,'toll')}</div>`
+  let vendor=el.querySelector('#tvendor')?.value||'';
+  let model=el.querySelector('#tmodel')?.value||'';
+  let ord=el.querySelector('#tord')?.value||'';
+  let set=el.querySelector('#tset')?.value||'';
+  let colour=el.querySelector('#tcolour')?.value||'';
+  let route=el.querySelector('#troute')?.value||'';
+  let baseRows=tollOutboundRows();
+
+  function applySelected(rows,skip){
+    if(skip!=='status'&&st)rows=rows.filter(function(x){return x.status===st;});
+    if(skip!=='vendor'&&vendor)rows=rows.filter(function(x){return x.vendor===vendor;});
+    if(skip!=='model'&&model)rows=rows.filter(function(x){return x.model===model;});
+    if(skip!=='orderNo'&&ord)rows=rows.filter(function(x){return x.orderNo===ord;});
+    if(skip!=='setCode'&&set)rows=rows.filter(function(x){return x.setCode===set;});
+    if(skip!=='colourCode'&&colour)rows=rows.filter(function(x){return x.colourCode===colour;});
+    if(skip!=='routes'&&route)rows=rows.filter(function(x){return x.routes===route;});
+    return rows;
+  }
+
+  function statusList(rows){
+    let has=new Set(rows.map(function(x){return x.status;}).filter(Boolean));
+    return ['In Stock','Used'].filter(function(x){return has.has(x);});
+  }
+
+  function normalizeFilters(){
+    for(let i=0;i<4;i++){
+      let changed=false;
+      let statuses=statusList(applySelected(baseRows,'status'));if(st&&!statuses.includes(st)){st='';changed=true;}
+      let vendors=unique(applySelected(baseRows,'vendor'),'vendor');if(vendor&&!vendors.includes(vendor)){vendor='';changed=true;}
+      let models=unique(applySelected(baseRows,'model'),'model');if(model&&!models.includes(model)){model='';changed=true;}
+      let orders=unique(applySelected(baseRows,'orderNo'),'orderNo');if(ord&&!orders.includes(ord)){ord='';changed=true;}
+      let setCodes=unique(applySelected(baseRows,'setCode'),'setCode');if(set&&!setCodes.includes(set)){set='';changed=true;}
+      let colourCodes=unique(applySelected(baseRows,'colourCode'),'colourCode');if(colour&&!colourCodes.includes(colour)){colour='';changed=true;}
+      let routes=unique(applySelected(baseRows,'routes'),'routes');if(route&&!routes.includes(route)){route='';changed=true;}
+      if(!changed)break;
+    }
+  }
+
+  normalizeFilters();
+  let statusOptions=statusList(applySelected(baseRows,'status'));
+  let vendorOptions=unique(applySelected(baseRows,'vendor'),'vendor');
+  let modelOptions=unique(applySelected(baseRows,'model'),'model');
+  let orderOptions=unique(applySelected(baseRows,'orderNo'),'orderNo');
+  let setCodeOptions=unique(applySelected(baseRows,'setCode'),'setCode');
+  let colourCodeOptions=unique(applySelected(baseRows,'colourCode'),'colourCode');
+  let routeOptions=unique(applySelected(baseRows,'routes'),'routes');
+  let rows=filter(applySelected(baseRows,null),q);
+  let totalRows=rows.length;
+  let totalPages=Math.max(1,Math.ceil(totalRows/AppState.tollPageSize));
+  if(AppState.tollPage>totalPages)AppState.tollPage=1;
+  let start=(AppState.tollPage-1)*AppState.tollPageSize;
+  let pageRows=rows.slice(start,start+AppState.tollPageSize);
+  let summaryHtml=statusSummaryHTML(rows,'status');
+  let emptyHint=baseRows.length?'' : '<div class="notice bad"><b>No Toll Global Outbound rows parsed.</b><br>Please upload Toll Global file that contains the Outbound sheet.</div>';
+
+  el.innerHTML=`<div class="panel"><h2>Toll Global Inventory</h2>${emptyHint}<div class="notice">Outbound sheet only. Header layout standardized as requested.</div><div class="toolbar"><select id="tst" onchange="AppState.tollPage=1;renderToll()"><option value="">All status</option>${statusOptions.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select><select id="tvendor" onchange="AppState.tollPage=1;renderToll()">${opt(vendorOptions,vendor,'All vendors')}</select><select id="tmodel" onchange="AppState.tollPage=1;renderToll()">${opt(modelOptions,model,'All models')}</select><select id="tord" onchange="AppState.tollPage=1;renderToll()">${opt(orderOptions,ord,'All order no')}</select><select id="tset" onchange="AppState.tollPage=1;renderToll()">${opt(setCodeOptions,set,'All set codes')}</select><select id="tcolour" onchange="AppState.tollPage=1;renderToll()">${opt(colourCodeOptions,colour,'All colour codes')}</select><select id="troute" onchange="AppState.tollPage=1;renderToll()">${opt(routeOptions,route,'All routes')}</select><input id="tq" placeholder="Search status, vendor, model, order, set code, colour code, route..." value="${esc(q)}" oninput="AppState.tollPage=1;renderToll()"><button class="btn secondary" onclick="resetTollView()">Reset View</button><button class="btn secondary" onclick="csvRows('toll-outbound-standardized.csv',getTollFiltered())">Export TOLL CSV</button></div>${summaryHtml}${t(pageRows,[{k:'status',l:'STATUS',f:pill},{k:'routes',l:'ROUTES'},{k:'vendor',l:'Vendor'},{k:'invoiceNo',l:'Invoice No'},{k:'orderNo',l:'Order No'},{k:'model',l:'Model'},{k:'setCode',l:'Set Code'},{k:'colourCode',l:'Colour Code'},{k:'lotAmount',l:'Lot Amount'},{k:'caseNo',l:'Case#'},{k:'dateArrived',l:'Date Arrived'},{k:'deliveryDate',l:'Delivery Date'}],1000,'toll')}<div class='toolbar'><button class='btn secondary' onclick='goTollFirst()'>First</button><button class='btn secondary' onclick='goTollPage(-1)'>Previous</button><span>Page ${AppState.tollPage} of ${totalPages}</span><button class='btn secondary' onclick='goTollPage(1)'>Next</button><button class='btn secondary' onclick='goTollLast(${totalPages})'>Last</button></div><p class='hint'>Showing ${pageRows.length.toLocaleString()} rows on this page out of ${totalRows.toLocaleString()} total rows. Standard page size: 1,000 rows.</p></div>`
 }
 function renderLedger(){let el=document.getElementById('ledger');if(!hasData()){el.innerHTML=noData('Movement ledger empty until generated');return}let q=el.querySelector('#mq')?.value||'';let rows=filter(AppState.db.movements,q);el.innerHTML=`<div class="panel"><h2>Movement Ledger</h2><div class="toolbar"><input id="mq" placeholder="Search invoice, model, container..." value="${esc(q)}" oninput="renderLedger()"><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export CSV</button></div>${t(rows,[{k:'date',l:'Date'},{k:'warehouse',l:'Warehouse'},{k:'containerNo',l:'Container'},{k:'invoiceNo',l:'Invoice'},{k:'caseMarkOrderNo',l:'Order/Case Mark'},{k:'model',l:'Model'},{k:'caseIn',l:'Case In'},{k:'caseOut',l:'Case Out'},{k:'balance',l:'Balance'},{k:'location',l:'Location'}],1000,'ledger')}</div>`}
 function renderSettings(){document.getElementById('settings').innerHTML=`<div class="panel"><h2>Export & System Settings</h2><div class="toolbar"><button class="btn secondary" onclick="csvRows('in-house-cases.csv',inhouseCaseRows())">Export All In-House Cases CSV</button><button class="btn secondary" onclick="csvRows('containers.csv',AppState.db.containers)">Export Containers CSV</button><button class="btn secondary" onclick="csvRows('movements.csv',AppState.db.movements)">Export Movements CSV</button><button class="btn secondary" onclick="exportJSON()">Export JSON Backup</button><button class="btn danger" onclick="clearAll()">Clear Generated Data (Strict Rule)</button></div><p class="hint">Strict safety rule is active. Regenerate and Clear require exact confirmation text and automatic backup.</p></div>`}
